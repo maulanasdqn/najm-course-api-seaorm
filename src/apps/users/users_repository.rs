@@ -6,7 +6,9 @@ use sea_orm::{entity::*, ActiveModelTrait, DatabaseConnection, PaginatorTrait, Q
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::apps::roles::roles_dto::RolesItemDto;
 use crate::libs::database::schemas::app_users_schema::ActiveModel as UserActiveModel;
+use crate::utils::meta::{TMetaRequest, TMetaResponse};
 use crate::{libs::database::get_db, utils::password::hash_password};
 
 use crate::libs::database::schemas::{
@@ -15,10 +17,10 @@ use crate::libs::database::schemas::{
 };
 
 use super::users_dto::{
-    RolesDto, TMetas, UsersCreateDto, UsersDetailResponse, UsersItemDto, UsersListResponse,
+    UsersDetailResponseDto, UsersItemDto, UsersListResponseDto, UsersRequestDto,
 };
 
-pub async fn mutation_create_users(new_user: Json<UsersCreateDto>) -> Response {
+pub async fn mutation_create_users(new_user: Json<UsersRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
 
     let existing_user = User::find()
@@ -59,11 +61,19 @@ pub async fn mutation_create_users(new_user: Json<UsersCreateDto>) -> Response {
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
         email_verified: Set(Some(Utc::now())),
-        avatar: Set(new_user.avatar.clone()),
+        avatar: Set(Some("".to_string())),
         phone_number: Set(new_user.phone_number.clone()),
         password: Set(hashed_password),
         referral_code: Set(new_user.referral_code.clone()),
         referred_by: Set(new_user.referred_by.clone()),
+        birth_date: Set(Some(Utc::now())),
+        gender: Set(Some("".to_string())),
+        religion: Set(Some("".to_string())),
+        identity_number: Set(Some("".to_string())),
+        is_deleted: Set(false),
+        is_active: Set(false),
+        is_profile_completed: Set(false),
+        student_type: Set(new_user.student_type.clone()),
         created_at: Set(Some(Utc::now())),
         updated_at: Set(Some(Utc::now())),
     };
@@ -82,11 +92,11 @@ pub async fn mutation_create_users(new_user: Json<UsersCreateDto>) -> Response {
     }
 }
 
-pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponse> {
+pub async fn query_get_user_by_id(id: Uuid) -> Json<UsersDetailResponseDto> {
     let db: DatabaseConnection = get_db().await;
 
     match User::find()
-        .filter(UserColumn::Email.eq(email.clone()))
+        .filter(UserColumn::Id.eq(id.clone()))
         .one(&db)
         .await
     {
@@ -96,7 +106,7 @@ pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponse>
                 .one(&db)
                 .await
                 .unwrap_or(None)
-                .map(|r| RolesDto {
+                .map(|r| RolesItemDto {
                     id: r.id.to_string(),
                     name: r.name,
                     permissions: vec![],
@@ -118,9 +128,9 @@ pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponse>
                 updated_at: user.updated_at.map(|dt| dt.to_string()),
             };
 
-            Json(UsersDetailResponse { data: user_detail })
+            Json(UsersDetailResponseDto { data: user_detail })
         }
-        Ok(None) => Json(UsersDetailResponse {
+        Ok(None) => Json(UsersDetailResponseDto {
             data: UsersItemDto {
                 id: "".to_string(),
                 fullname: "".to_string(),
@@ -135,7 +145,7 @@ pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponse>
                 updated_at: None,
             },
         }),
-        Err(_) => Json(UsersDetailResponse {
+        Err(_) => Json(UsersDetailResponseDto {
             data: UsersItemDto {
                 id: "".to_string(),
                 fullname: "".to_string(),
@@ -153,7 +163,78 @@ pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponse>
     }
 }
 
-pub async fn query_get_users(params: TMetas) -> Json<UsersListResponse> {
+pub async fn query_get_user_by_email(email: String) -> Json<UsersDetailResponseDto> {
+    let db: DatabaseConnection = get_db().await;
+
+    match User::find()
+        .filter(UserColumn::Email.eq(email.clone()))
+        .one(&db)
+        .await
+    {
+        Ok(Some(user)) => {
+            let role = Role::find()
+                .filter(RoleColumn::Id.eq(user.role_id))
+                .one(&db)
+                .await
+                .unwrap_or(None)
+                .map(|r| RolesItemDto {
+                    id: r.id.to_string(),
+                    name: r.name,
+                    permissions: vec![],
+                    created_at: r.created_at.map(|dt| dt.to_string()),
+                    updated_at: r.updated_at.map(|dt| dt.to_string()),
+                });
+
+            let user_detail = UsersItemDto {
+                id: user.id.to_string(),
+                fullname: user.fullname,
+                email: user.email,
+                avatar: user.avatar,
+                phone_number: user.phone_number,
+                password: user.password,
+                referral_code: user.referral_code,
+                referred_by: user.referred_by,
+                role,
+                created_at: user.created_at.map(|dt| dt.to_string()),
+                updated_at: user.updated_at.map(|dt| dt.to_string()),
+            };
+
+            Json(UsersDetailResponseDto { data: user_detail })
+        }
+        Ok(None) => Json(UsersDetailResponseDto {
+            data: UsersItemDto {
+                id: "".to_string(),
+                fullname: "".to_string(),
+                email: "".to_string(),
+                avatar: None,
+                password: "".to_string(),
+                phone_number: "".to_string(),
+                referral_code: None,
+                referred_by: None,
+                role: None,
+                created_at: None,
+                updated_at: None,
+            },
+        }),
+        Err(_) => Json(UsersDetailResponseDto {
+            data: UsersItemDto {
+                id: "".to_string(),
+                fullname: "".to_string(),
+                email: "".to_string(),
+                avatar: None,
+                phone_number: "".to_string(),
+                password: "".to_string(),
+                referral_code: None,
+                referred_by: None,
+                role: None,
+                created_at: None,
+                updated_at: None,
+            },
+        }),
+    }
+}
+
+pub async fn query_get_users(params: TMetaRequest) -> Json<UsersListResponseDto> {
     let db: DatabaseConnection = get_db().await;
 
     let page = params.page.unwrap_or(1);
@@ -173,7 +254,7 @@ pub async fn query_get_users(params: TMetas) -> Json<UsersListResponse> {
                     .await
                     .unwrap_or_else(|_| vec![]);
 
-                let role = roles.into_iter().next().map(|r| RolesDto {
+                let role = roles.into_iter().next().map(|r| RolesItemDto {
                     id: r.id.to_string(),
                     name: r.name,
                     permissions: vec![],
@@ -196,18 +277,18 @@ pub async fn query_get_users(params: TMetas) -> Json<UsersListResponse> {
                 });
             }
 
-            Json(UsersListResponse {
+            Json(UsersListResponseDto {
                 data,
-                meta: Some(TMetas {
+                meta: Some(TMetaResponse {
                     page: Some(page),
                     per_page: Some(per_page),
                     total: Some(total_items),
                 }),
             })
         }
-        Err(_) => Json(UsersListResponse {
+        Err(_) => Json(UsersListResponseDto {
             data: vec![],
-            meta: Some(TMetas {
+            meta: Some(TMetaResponse {
                 page: Some(page),
                 per_page: Some(per_page),
                 total: Some(0),

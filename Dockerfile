@@ -1,20 +1,24 @@
+
 FROM rust:latest AS builder
 
 WORKDIR /app
 
 COPY . .
 
-RUN rustup target add x86_64-unknown-linux-musl \
-    && apt-get update \
-    && apt-get install -y musl-tools \
-    && cargo build --release --target=x86_64-unknown-linux-musl
+RUN apt-get update \
+    && apt-get install -y libssl-dev pkg-config \
+    && cargo build --release
 
-FROM alpine:latest
+FROM ubuntu:latest
 
-RUN apk add --no-cache openssl-dev pkgconf
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/local/bin
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/try-out-api ./try-out-api
+COPY --from=builder /app/target/release/najm-course-api ./najm-course-api
 
-CMD ["./try-out-api"]
+CMD ["./najm-course-api"]
+

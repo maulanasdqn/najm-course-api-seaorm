@@ -1,4 +1,4 @@
-use try_out_api::{apps::routes, libs::axum::run};
+use najm_course_api::{apps::routes, libs::axum::run};
 
 #[tokio::main]
 async fn main() {

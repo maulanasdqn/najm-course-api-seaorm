@@ -1,17 +1,17 @@
+use crate::{apps::roles::roles_dto::RolesItemDto, utils::meta::TMetaResponse};
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct UsersCreateDto {
+pub struct UsersRequestDto {
+    pub role_id: String,
     pub fullname: String,
     pub email: String,
-    pub avatar: Option<String>,
+    pub student_type: String,
     pub phone_number: String,
     pub password: String,
     pub referral_code: Option<String>,
     pub referred_by: Option<String>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -24,42 +24,18 @@ pub struct UsersItemDto {
     pub phone_number: String,
     pub referral_code: Option<String>,
     pub referred_by: Option<String>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
-    pub role: Option<RolesDto>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct RolesDto {
-    pub id: String,
-    pub name: String,
-    pub permissions: Vec<PermissionsDto>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PermissionsDto {
-    pub id: String,
-    pub name: String,
+    pub role: Option<RolesItemDto>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct UsersListResponse {
+pub struct UsersListResponseDto {
     pub data: Vec<UsersItemDto>,
-    pub meta: Option<TMetas>,
+    pub meta: Option<TMetaResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct UsersDetailResponse {
+pub struct UsersDetailResponseDto {
     pub data: UsersItemDto,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, IntoParams)]
-pub struct TMetas {
-    pub page: Option<u64>,
-    pub per_page: Option<u64>,
-    pub total: Option<u64>,
 }
