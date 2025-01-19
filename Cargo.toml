@@ -6,9 +6,23 @@ edition = "2021"
 [dependencies]
 argon2 = { version = "0.5.3", features = ["password-hash"] }
 axum = "0.7.9"
-chrono = "0.4.39"
+chrono = { version = "0.4.39", features = ["serde"] }
+dotenv = "0.15.0"
 jsonwebtoken = "9.3.0"
+log = "0.4.25"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
+sea-orm = { version = "1.1.4", features = [ "sqlx-postgres", "macros", "with-json", "with-uuid", "runtime-tokio", "runtime-tokio-native-tls"] }
+sea-orm-migration = { version = "1.1.0", features = ["sqlx-postgres", "runtime-tokio", "runtime-tokio-native-tls"] }
 serde = "1.0.217"
 serde_json = "1.0.134"
+thiserror = "2.0.9"
 tokio = { version = "1.42.0", features = ["full"] }
+uuid = { version = "1.11.0", features = ["v4"] }
+validator = { version = "0.19.0", features = ["derive"] }
+utoipa = { version = "4.1.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "5.0.0", features = ["axum"] }
+utoipa-redoc = { version = "2.0.0", features = ["axum"] }
+utoipa-rapidoc = { version = "2.0.0", features = ["axum"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["cors"] }
+

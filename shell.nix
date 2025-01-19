@@ -6,9 +6,6 @@ pkgs.mkShell {
     rustfmt
     crate2nix
     clippy
-    surrealdb
-    surrealist
-    surrealdb-migrations
 
     (writeScriptBin "helpme" ''
       __usage="

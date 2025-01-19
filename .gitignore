@@ -1,5 +1,13 @@
-/target
+# Build
+target
+result
+
+# Environment
 .env
 .env.local
 .env.prod
 .envrc
+
+# Nix
+Cargo.nix
+.direnv
