@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::utils::meta::TMetaRequest;
 
 use super::{
-    users_dto::UsersRequestDto,
+    users_dto::UsersCreateRequestDto,
     users_repository::{mutation_create_users, query_get_user_by_id, query_get_users},
 };
 
@@ -61,7 +61,7 @@ pub async fn get_detail_user(Path(id): Path<Uuid>) -> impl IntoResponse {
     tag = "Users"
 )]
 
-pub async fn post_create_user(Json(payload): Json<UsersRequestDto>) -> impl IntoResponse {
+pub async fn post_create_user(Json(payload): Json<UsersCreateRequestDto>) -> impl IntoResponse {
     mutation_create_users(Json(payload)).await
 }
 
@@ -85,7 +85,7 @@ pub async fn delete_user() -> impl IntoResponse {
 #[utoipa::path(
     put,
     path = "/api/users/update/{id}",
-    request_body = UsersRequestDto,
+    request_body = UsersUpdateRequestDto,
     security(
         ("Bearer" = [])
     ),

@@ -1,13 +1,17 @@
-use crate::apps::users::users_repository::query_get_user_by_email;
 use crate::utils::jwt::decode_access_token;
 use axum::{
     body::Body,
     extract::Request,
-    http::{self, Response, StatusCode},
+    http::{
+        header::{AUTHORIZATION, CONTENT_TYPE},
+        Response, StatusCode,
+    },
     middleware::Next,
 };
 use serde_json::json;
 use std::convert::Infallible;
+
+use super::auth_repository::query_get_user_by_email;
 
 fn format_error(message: String) -> Response<Body> {
     let error_body = json!({
@@ -16,7 +20,7 @@ fn format_error(message: String) -> Response<Body> {
 
     Response::builder()
         .status(StatusCode::FORBIDDEN)
-        .header(http::header::CONTENT_TYPE, "application/json")
+        .header(CONTENT_TYPE, "application/json")
         .body(Body::from(error_body.to_string()))
         .unwrap()
 }
@@ -25,7 +29,7 @@ pub async fn authorization_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response<Body>, Infallible> {
-    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
+    let auth_header = req.headers_mut().get(AUTHORIZATION);
 
     let auth_header = match auth_header {
         Some(header) => header.to_str(),
@@ -42,6 +46,7 @@ pub async fn authorization_middleware(
     };
 
     let mut header_parts = auth_header.split_whitespace();
+
     let token = match header_parts.nth(1) {
         Some(token) => token,
         None => {
@@ -56,12 +61,14 @@ pub async fn authorization_middleware(
         }
     };
 
-    let user_response = query_get_user_by_email(token_data.claims.email.clone()).await;
-    if user_response.data.email.is_empty() {
+    let user_response = query_get_user_by_email(token_data.claims.email)
+        .await
+        .unwrap();
+    if user_response.email.is_empty() {
         return Ok(format_error("Unauthorized user".to_string()));
     }
 
-    req.extensions_mut().insert(user_response.data.clone());
+    req.extensions_mut().insert(user_response);
 
     let response = next.run(req).await;
     Ok(response)

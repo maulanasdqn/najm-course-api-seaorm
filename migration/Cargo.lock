@@ -1595,8 +1595,8 @@ name = "migration"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "najm-course-api",
  "sea-orm-migration",
- "try-out-api",
 ]
 
 [[package]]
@@ -1633,6 +1633,33 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "najm-course-api"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "axum",
+ "chrono",
+ "dotenv",
+ "jsonwebtoken",
+ "log",
+ "rand_core",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tokio",
+ "tower",
+ "tower-http",
+ "utoipa",
+ "utoipa-rapidoc",
+ "utoipa-redoc",
+ "utoipa-swagger-ui",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -3315,33 +3342,6 @@ dependencies = [
  "thread_local",
  "tracing",
  "tracing-core",
-]
-
-[[package]]
-name = "try-out-api"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "axum",
- "chrono",
- "dotenv",
- "jsonwebtoken",
- "log",
- "rand_core",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_json",
- "thiserror 2.0.11",
- "tokio",
- "tower",
- "tower-http",
- "utoipa",
- "utoipa-rapidoc",
- "utoipa-redoc",
- "utoipa-swagger-ui",
- "uuid",
- "validator",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ pkgs.mkShell {
 
     (writeScriptBin "helpme" ''
       __usage="
-      👋 Welcome to TryOutAPI development environment. 🚀
+      👋 Welcome to Najm Course API development environment. 🚀
       If you see this message, it means your are inside the Nix shell ❄️.
 
       [Info]===============================================================>
@@ -39,8 +39,8 @@ pkgs.mkShell {
 
     (writeScriptBin "start" ''
       echo "Starting project in production mode..."
-      echo "TryOutAPI started on port $PORT 🛹..."
-      ./result/bin/try-out-api
+      echo "Najm Course API started on port $PORT 🛹..."
+      ./result/bin/najm-course-api
     '')
 
     (writeScriptBin "build" ''

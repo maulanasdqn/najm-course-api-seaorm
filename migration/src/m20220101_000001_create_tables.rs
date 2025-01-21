@@ -1,7 +1,7 @@
-use sea_orm_migration::prelude::*;
-use try_out_api::libs::database::schemas::{
+use najm_course_api::libs::database::schemas::{
     app_permissions_schema, app_roles_permissions_schema, app_roles_schema, app_users_schema,
 };
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;

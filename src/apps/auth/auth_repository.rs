@@ -1,9 +1,13 @@
 use crate::apps::auth::auth_dto::{AuthDataDto, AuthLoginDto, AuthResponse, AuthTokenDto};
-use crate::apps::users::users_repository::query_get_user_by_email;
+use crate::apps::roles::roles_dto::RolesItemDto;
+use crate::apps::users::users_dto::UsersCheckLoginDto;
+use crate::apps::users::users_repository::query_get_user_by_id;
 use crate::libs::database::get_db;
+use crate::libs::database::schemas::app_roles_schema::{Column as RoleColumn, Entity as Role};
 use crate::libs::database::schemas::app_users_schema::{
     ActiveModel as UserActiveModel, Column as UserColumn, Entity as User,
 };
+use crate::utils::error::AppError;
 use crate::utils::jwt::{encode_access_token, encode_refresh_token};
 use crate::utils::password::{hash_password, verify_password};
 use axum::{
@@ -18,6 +22,43 @@ use uuid::Uuid;
 
 use super::auth_dto::AuthRegisterDto;
 
+pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLoginDto>, AppError> {
+    let db: DatabaseConnection = get_db().await;
+
+    if let Some(user) = User::find()
+        .filter(UserColumn::Email.eq(email))
+        .one(&db)
+        .await?
+    {
+        let user_detail = UsersCheckLoginDto {
+            id: user.id.to_string(),
+            fullname: user.fullname,
+            email: user.email,
+            password: user.password,
+        };
+
+        Ok(Json(user_detail))
+    } else {
+        Err(AppError::NotFound)
+    }
+}
+
+async fn query_get_role_student_id(db: &DatabaseConnection) -> Result<RolesItemDto, AppError> {
+    Role::find()
+        .filter(RoleColumn::Name.eq("Student"))
+        .one(db)
+        .await
+        .map_err(|err| AppError::DatabaseError(err))?
+        .map(|r| RolesItemDto {
+            id: r.id.to_string(),
+            name: r.name,
+            permissions: vec![],
+            created_at: r.created_at.map(|dt| dt.to_string()),
+            updated_at: r.updated_at.map(|dt| dt.to_string()),
+        })
+        .ok_or(AppError::NotFound)
+}
+
 pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
     if credentials.email.is_empty() || credentials.password.is_empty() {
         return (
@@ -27,9 +68,11 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
             .into_response();
     }
 
-    let user_response = query_get_user_by_email(credentials.email.clone()).await;
+    let user_response = query_get_user_by_email(credentials.email.clone())
+        .await
+        .unwrap();
 
-    if user_response.data.email.is_empty() {
+    if user_response.email.is_empty() {
         return (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "message": "Account not found" })),
@@ -37,7 +80,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
             .into_response();
     }
 
-    let hashed_password = user_response.data.password.clone();
+    let hashed_password = &user_response.password;
 
     let is_password_valid =
         verify_password(&credentials.password, &hashed_password).unwrap_or(false);
@@ -50,8 +93,11 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
             .into_response();
     }
 
-    let access_token = encode_access_token(user_response.data.email.clone()).unwrap();
-    let refresh_token = encode_refresh_token(user_response.data.email.clone()).unwrap();
+    let access_token = encode_access_token(user_response.email.clone()).unwrap();
+    let refresh_token = encode_refresh_token(user_response.email.clone()).unwrap();
+    let user_data = query_get_user_by_id(Uuid::parse_str(user_response.id.as_str()).unwrap())
+        .await
+        .unwrap();
 
     let auth_response = AuthResponse {
         data: AuthDataDto {
@@ -59,7 +105,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
                 access_token,
                 refresh_token,
             },
-            user: user_response.data.clone(),
+            user: user_data.data.clone(),
         },
     };
 
@@ -95,7 +141,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "message": "Failed to hash password" })),
+                Json(json!({ "message": "Email or password is invalid" })),
             )
                 .into_response();
         }
@@ -103,7 +149,10 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
 
     let active_model = UserActiveModel {
         id: Set(Uuid::new_v4()),
-        role_id: Set(Uuid::new_v4()),
+        role_id: Set(
+            Uuid::parse_str(query_get_role_student_id(&db).await.unwrap().id.as_str())
+                .unwrap_or(Uuid::new_v4()),
+        ),
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
         email_verified: Set(Some(Utc::now())),
