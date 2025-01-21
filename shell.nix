@@ -56,7 +56,7 @@ pkgs.mkShell {
 
     (writeScriptBin "build-docker" ''
       echo "Building project with docker..."
-      docker build -t wedding-api .
+      docker build -t najm-course-api:latest .
       echo "Project built successfully."
       echo "Now you can start the project with the command 'start-docker'"
     '')

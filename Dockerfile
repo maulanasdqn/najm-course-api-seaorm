@@ -1,24 +1,31 @@
+# Build stage
+FROM rust:1.83-slim-bullseye AS builder
 
-FROM rust:latest AS builder
-
-WORKDIR /app
-
-COPY . .
-
-RUN apt-get update \
-    && apt-get install -y libssl-dev pkg-config \
-    && cargo build --release
-
-FROM ubuntu:latest
-
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
+    build-essential \
     libssl-dev \
-    && apt-get clean \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/local/bin
+# Set the working directory
+WORKDIR /app
 
-COPY --from=builder /app/target/release/najm-course-api ./najm-course-api
+# Copy only the Cargo files to optimize layer caching
+COPY Cargo.toml Cargo.lock ./
+COPY ./src ./src
 
-CMD ["./najm-course-api"]
+# Build the application in release mode
+RUN cargo build --release && strip /app/target/release/najm-course-api
 
+# Final stage
+FROM gcr.io/distroless/cc AS runner
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the statically compiled binary from the builder
+COPY --from=builder /app/target/release/najm-course-api .
+
+# Command to run the application
+CMD ["/app/najm-course-api"]
