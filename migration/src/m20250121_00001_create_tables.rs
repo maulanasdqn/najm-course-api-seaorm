@@ -12,13 +12,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(AppRoles::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(AppRoles::Id)
-                            .uuid()
-                            .not_null()
-                            .primary_key()
-                            .default(Expr::func(Func::custom("gen_random_uuid"))),
-                    )
+                    .col(ColumnDef::new(AppRoles::Id).uuid().not_null().primary_key())
                     .col(ColumnDef::new(AppRoles::Name).string().not_null())
                     .col(ColumnDef::new(AppRoles::CreatedAt).timestamp_with_time_zone())
                     .col(ColumnDef::new(AppRoles::UpdatedAt).timestamp_with_time_zone())
