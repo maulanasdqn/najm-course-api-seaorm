@@ -4,7 +4,7 @@ mod roles;
 mod users;
 
 use crate::utils::meta::{TMetaRequest, TMetaResponse};
-use auth::{auth_middleware::authorization_middleware, auth_router};
+use auth::auth_middleware::authorization_middleware;
 use axum::{
     http::{header, HeaderValue, Method},
     middleware::from_fn,
@@ -18,11 +18,10 @@ use utoipa::{
     openapi::security::{Http, HttpAuthScheme, SecurityScheme},
     Modify, OpenApi,
 };
-use utoipa_rapidoc::RapiDoc;
 use utoipa_swagger_ui::SwaggerUi;
 
 
-pub async fn routes() -> Router {
+pub async fn root_routes() -> Router {
     #[derive(OpenApi)]
     #[openapi(
         paths(
@@ -125,27 +124,27 @@ pub async fn routes() -> Router {
 
     let cors_middleware = CorsLayer::new()
         .allow_origin(allowed_origins)
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true);
 
+    let public_routes = Router::new()
+        .nest("/auth", auth::auth_router())
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()));
+
+    let protected_routes =  Router::new()
+        .nest("/users",users::users_router())
+        .nest("/roles",roles::roles_router())
+        .nest("/permissions",permissions::permissions_router())
+        .layer(from_fn(authorization_middleware));
+
+    let api_routes = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes);
+
+
     Router::new()
         .route("/", get(|| async { Redirect::temporary("/api/docs") }))
-        .nest(
-            "/api",
-            Router::new()
-                .nest("", protected_routes().await)
-                .nest("/auth", auth_router()),
-        )
-        .merge(SwaggerUi::new("/api/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .merge(RapiDoc::new("/api-docs/openapi.json").path("/api/rapidoc"))
+        .nest("/api", api_routes)
         .layer(cors_middleware)
-}
-
-async fn protected_routes() -> Router {
-    Router::new()
-        .nest("/users", users::users_router())
-        .nest("/roles", roles::roles_router())
-        .nest("/permissions", permissions::permissions_router())
-        .layer(from_fn(authorization_middleware))
 }

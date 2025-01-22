@@ -26,6 +26,7 @@ pub enum Relation {
     Role,
 }
 
+// Define related entities
 impl Related<super::app_permissions_schema::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Permission.def()

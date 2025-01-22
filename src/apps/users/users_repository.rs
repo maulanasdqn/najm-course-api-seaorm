@@ -2,40 +2,29 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use chrono::Utc;
-use sea_orm::{entity::*, ActiveModelTrait, DatabaseConnection, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    entity::*, ActiveModelTrait, DatabaseConnection, JoinType, PaginatorTrait, QueryFilter,
+    QuerySelect, Set,
+};
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::apps::roles::roles_dto::RolesItemDto;
+use crate::apps::roles::roles_repository::query_get_role_by_id;
 use crate::libs::database::schemas::app_users_schema::ActiveModel as UserActiveModel;
 use crate::utils::error::AppError;
 use crate::utils::meta::{TMetaRequest, TMetaResponse};
 use crate::{libs::database::get_db, utils::password::hash_password};
 
 use crate::libs::database::schemas::{
-    app_roles_schema::Column as RoleColumn, app_roles_schema::Entity as Role,
-    app_users_schema::Column as UserColumn, app_users_schema::Entity as User,
+    app_roles_schema::Entity as Role, app_users_schema::Column as UserColumn,
+    app_users_schema::Entity as User, app_users_schema::Relation as UserRelation,
 };
 
 use super::users_dto::{
-    UsersCreateRequestDto, UsersDetailResponseDto, UsersItemDto, UsersListResponseDto,
+    UsersCreateRequestDto, UsersDetailResponseDto, UsersItemDto, UsersItemListDto,
+    UsersListResponseDto,
 };
-
-async fn get_role_by_id(db: &DatabaseConnection, role_id: Uuid) -> Option<RolesItemDto> {
-    Role::find()
-        .filter(RoleColumn::Id.eq(role_id))
-        .one(db)
-        .await
-        .unwrap_or(None)
-        .map(|r| RolesItemDto {
-            id: r.id.to_string(),
-            name: r.name,
-            permissions: vec![],
-            created_at: r.created_at.map(|dt| dt.to_string()),
-            updated_at: r.updated_at.map(|dt| dt.to_string()),
-        })
-}
 
 pub async fn mutation_create_users(
     new_user: Json<UsersCreateRequestDto>,
@@ -95,7 +84,13 @@ pub async fn query_get_user_by_id(id: Uuid) -> Result<Json<UsersDetailResponseDt
     let db: DatabaseConnection = get_db().await;
 
     if let Some(user) = User::find().filter(UserColumn::Id.eq(id)).one(&db).await? {
-        let role = get_role_by_id(&db, user.role_id).await;
+        let role = Some(
+            query_get_role_by_id(user.role_id)
+                .await
+                .unwrap()
+                .data
+                .clone(),
+        );
 
         let user_detail = UsersItemDto {
             id: user.id.to_string(),
@@ -124,13 +119,16 @@ pub async fn query_get_users(params: TMetaRequest) -> Json<UsersListResponseDto>
 
     let paginator = User::find()
         .filter(UserColumn::IsDeleted.eq(false))
+        .join(JoinType::LeftJoin, UserRelation::Role.def())
+        .select_also(Role)
         .paginate(&db, per_page);
+
     let total_items = paginator.num_items().await.unwrap_or(0);
 
-    let users = paginator.fetch_page(page - 1).await.unwrap_or(vec![]);
-    let data: Vec<UsersItemDto> = users
+    let results = paginator.fetch_page(page - 1).await.unwrap_or(vec![]);
+    let data: Vec<UsersItemListDto> = results
         .into_iter()
-        .map(|user| UsersItemDto {
+        .map(|(user, role)| UsersItemListDto {
             id: user.id.to_string(),
             fullname: user.fullname,
             email: user.email,
@@ -138,7 +136,7 @@ pub async fn query_get_users(params: TMetaRequest) -> Json<UsersListResponseDto>
             phone_number: user.phone_number,
             referral_code: user.referral_code,
             referred_by: user.referred_by,
-            role: None,
+            role: role.map(|r| r.name).unwrap_or("-".to_string()),
             created_at: user.created_at.map(|dt| dt.to_string()),
             updated_at: user.updated_at.map(|dt| dt.to_string()),
         })

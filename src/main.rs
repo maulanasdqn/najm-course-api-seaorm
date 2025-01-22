@@ -1,6 +1,6 @@
-use najm_course_api::{apps::routes, libs::axum::run};
+use najm_course_api::{apps::root_routes, libs::axum::run};
 
 #[tokio::main]
 async fn main() {
-    run(routes).await;
+    run(root_routes).await;
 }

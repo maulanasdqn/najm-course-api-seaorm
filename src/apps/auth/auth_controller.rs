@@ -1,5 +1,8 @@
 use super::{
-    auth_dto::{AuthLoginDto, AuthRegisterDto},
+    auth_dto::{
+        AuthForgotDto, AuthLoginDto, AuthRegisterDto, AuthRequestNewPasswordDto, AuthResponse,
+        AuthVerifyEmailDto, MessageResponse,
+    },
     auth_repository::{mutation_login, mutation_register},
 };
 use axum::{extract::Json, response::IntoResponse};

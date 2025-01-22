@@ -1,14 +1,17 @@
 use axum::{
     extract::{Path, Query},
+    http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use uuid::Uuid;
 
-use crate::utils::meta::TMetaRequest;
+use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
 
 use super::{
-    users_dto::UsersCreateRequestDto,
+    users_dto::{
+        UsersCreateRequestDto, UsersDetailResponseDto, UsersListResponseDto, UsersUpdateRequestDto,
+    },
     users_repository::{mutation_create_users, query_get_user_by_id, query_get_users},
 };
 
@@ -43,14 +46,20 @@ pub async fn get_users(Query(params): Query<TMetaRequest>) -> impl IntoResponse 
     tag = "Users"
 )]
 
-pub async fn get_detail_user(Path(id): Path<Uuid>) -> impl IntoResponse {
-    query_get_user_by_id(id).await
+pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
+    match Uuid::parse_str(&id) {
+        Ok(uuid) => match query_get_user_by_id(uuid).await {
+            Ok(response) => response.into_response(),
+            Err(err) => err.into_response(),
+        },
+        Err(_) => (StatusCode::BAD_REQUEST, "Invalid UUID format").into_response(),
+    }
 }
 
 #[utoipa::path(
     post,
     path = "/api/users/create",
-    request_body = UsersRequestDto,
+    request_body = UsersCreateRequestDto,
     security(
         ("Bearer" = [])
     ),

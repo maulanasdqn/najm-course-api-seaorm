@@ -1,5 +1,9 @@
-use crate::utils::meta::TMetaRequest;
+use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
 use axum::response::IntoResponse;
+
+use super::permissions_dto::{
+    PermissionsDetailResponseDto, PermissionsListResponseDto, PermissionsRequestDto,
+};
 
 #[utoipa::path(
     get,

@@ -47,6 +47,20 @@ pub struct UsersItemDto {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UsersItemListDto {
+    pub id: String,
+    pub fullname: String,
+    pub email: String,
+    pub avatar: Option<String>,
+    pub phone_number: String,
+    pub referral_code: Option<String>,
+    pub referred_by: Option<String>,
+    pub role: String,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UsersCheckLoginDto {
     pub id: String,
     pub fullname: String,
@@ -56,7 +70,7 @@ pub struct UsersCheckLoginDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UsersListResponseDto {
-    pub data: Vec<UsersItemDto>,
+    pub data: Vec<UsersItemListDto>,
     pub meta: Option<TMetaResponse>,
 }
 

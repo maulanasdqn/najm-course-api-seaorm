@@ -1,5 +1,14 @@
-use crate::utils::meta::TMetaRequest;
-use axum::response::IntoResponse;
+use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
+use axum::{
+    extract::{Path, Query},
+    response::IntoResponse,
+};
+use uuid::Uuid;
+
+use super::{
+    roles_dto::{RolesDetailResponseDto, RolesListResponseDto, RolesRequestDto},
+    roles_repository::{query_get_role_by_id, query_get_roles},
+};
 
 #[utoipa::path(
     get,
@@ -15,8 +24,8 @@ use axum::response::IntoResponse;
     tag = "Roles"
 )]
 
-pub async fn get_roles() -> impl IntoResponse {
-    ()
+pub async fn get_roles(Query(params): Query<TMetaRequest>) -> impl IntoResponse {
+    query_get_roles(params).await
 }
 
 #[utoipa::path(
@@ -32,8 +41,8 @@ pub async fn get_roles() -> impl IntoResponse {
     tag = "Roles"
 )]
 
-pub async fn get_detail_role() -> impl IntoResponse {
-    ()
+pub async fn get_detail_role(Path(id): Path<Uuid>) -> impl IntoResponse {
+    query_get_role_by_id(id).await
 }
 
 #[utoipa::path(
