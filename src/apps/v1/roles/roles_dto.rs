@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{apps::permissions::permissions_dto::PermissionsItemDto, utils::meta::TMetaResponse};
+use crate::{
+    apps::v1::permissions::permissions_dto::PermissionsItemDto, utils::dto::MetaResponseDto,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RolesRequestDto {
@@ -20,10 +22,12 @@ pub struct RolesItemDto {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RolesListResponseDto {
     pub data: Vec<RolesItemDto>,
-    pub meta: TMetaResponse,
+    pub meta: MetaResponseDto,
+    pub version: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RolesDetailResponseDto {
     pub data: RolesItemDto,
+    pub version: String,
 }

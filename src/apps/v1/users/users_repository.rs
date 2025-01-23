@@ -10,26 +10,26 @@ use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::apps::roles::roles_repository::query_get_role_by_id;
-use crate::libs::database::schemas::app_users_schema::ActiveModel as UserActiveModel;
-use crate::utils::error::AppError;
-use crate::utils::meta::{TMetaRequest, TMetaResponse};
-use crate::{libs::database::get_db, utils::password::hash_password};
-
-use crate::libs::database::schemas::{
-    app_roles_schema::Entity as Role, app_users_schema::Column as UserColumn,
-    app_users_schema::Entity as User, app_users_schema::Relation as UserRelation,
-};
-
 use super::users_dto::{
     UsersCreateRequestDto, UsersDetailResponseDto, UsersItemDto, UsersItemListDto,
     UsersListResponseDto,
 };
+use crate::apps::v1::roles::roles_repository::query_get_role_by_id;
+use crate::get_version;
+use crate::libs::database::schemas::app_users_schema::ActiveModel as UserActiveModel;
+use crate::libs::database::schemas::{
+    app_roles_schema::Entity as Role, app_users_schema::Column as UserColumn,
+    app_users_schema::Entity as User, app_users_schema::Relation as UserRelation,
+};
+use crate::utils::dto::{MetaRequestDto, MetaResponseDto};
+use crate::utils::error::AppError;
+use crate::{libs::database::get_db, utils::password::hash_password};
 
 pub async fn mutation_create_users(
     new_user: Json<UsersCreateRequestDto>,
 ) -> Result<Response, AppError> {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     new_user
         .validate()
@@ -75,13 +75,14 @@ pub async fn mutation_create_users(
 
     Ok((
         StatusCode::CREATED,
-        Json(json!({ "message": "User created successfully" })),
+        Json(json!({ "message": "User created successfully", "version": version })),
     )
         .into_response())
 }
 
 pub async fn query_get_user_by_id(id: Uuid) -> Result<Json<UsersDetailResponseDto>, AppError> {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     if let Some(user) = User::find().filter(UserColumn::Id.eq(id)).one(&db).await? {
         let role = Some(
@@ -105,14 +106,18 @@ pub async fn query_get_user_by_id(id: Uuid) -> Result<Json<UsersDetailResponseDt
             updated_at: user.updated_at.map(|dt| dt.to_string()),
         };
 
-        Ok(Json(UsersDetailResponseDto { data: user_detail }))
+        Ok(Json(UsersDetailResponseDto {
+            data: user_detail,
+            version,
+        }))
     } else {
         Err(AppError::NotFound)
     }
 }
 
-pub async fn query_get_users(params: TMetaRequest) -> Json<UsersListResponseDto> {
+pub async fn query_get_users(params: MetaRequestDto) -> Json<UsersListResponseDto> {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(10).max(1).min(100);
@@ -144,10 +149,11 @@ pub async fn query_get_users(params: TMetaRequest) -> Json<UsersListResponseDto>
 
     Json(UsersListResponseDto {
         data,
-        meta: Some(TMetaResponse {
+        meta: Some(MetaResponseDto {
             page: Some(page),
             per_page: Some(per_page),
             total: Some(total_items),
         }),
+        version,
     })
 }

@@ -6,7 +6,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
+use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
 
 use super::{
     users_dto::{
@@ -17,31 +17,31 @@ use super::{
 
 #[utoipa::path(
     get,
-    path = "/api/users",
-    params(TMetaRequest),
+    path = "/v1/users",
+    params(MetaRequestDto),
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "List Users", body = UsersListResponseDto),
-        (status = 400, description = "Invalid Users data", body = MessageResponse)
+        (status = 400, description = "Invalid Users data", body = MessageResponseDto)
     ),
     tag = "Users"
 )]
 
-pub async fn get_users(Query(params): Query<TMetaRequest>) -> impl IntoResponse {
+pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoResponse {
     query_get_users(params).await
 }
 
 #[utoipa::path(
     get,
-    path = "/api/users/detail/{id}",
+    path = "/v1/users/detail/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "Detail User", body = UsersDetailResponseDto),
-        (status = 400, description = "Invalid User data", body = MessageResponse)
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
     ),
     tag = "Users"
 )]
@@ -58,14 +58,14 @@ pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/users/create",
+    path = "/v1/users/create",
     request_body = UsersCreateRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "User Created", body = MessageResponse),
-        (status = 400, description = "Invalid User data", body = MessageResponse)
+        (status = 201, description = "User Created", body = MessageResponseDto),
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
     ),
     tag = "Users"
 )]
@@ -76,13 +76,13 @@ pub async fn post_create_user(Json(payload): Json<UsersCreateRequestDto>) -> imp
 
 #[utoipa::path(
     delete,
-    path = "/api/users/delete/{id}",
+    path = "/v1/users/delete/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "User Deleted", body = MessageResponse),
-        (status = 400, description = "Invalid User data", body = MessageResponse)
+        (status = 201, description = "User Deleted", body = MessageResponseDto),
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
     ),
     tag = "Users"
 )]
@@ -93,14 +93,14 @@ pub async fn delete_user() -> impl IntoResponse {
 
 #[utoipa::path(
     put,
-    path = "/api/users/update/{id}",
+    path = "/v1/users/update/{id}",
     request_body = UsersUpdateRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "User Updated", body = MessageResponse),
-        (status = 400, description = "Invalid User data", body = MessageResponse)
+        (status = 201, description = "User Updated", body = MessageResponseDto),
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
     ),
     tag = "Users"
 )]

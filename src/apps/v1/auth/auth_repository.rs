@@ -1,12 +1,14 @@
-use crate::apps::auth::auth_dto::{AuthDataDto, AuthLoginDto, AuthResponse, AuthTokenDto};
-use crate::apps::roles::roles_dto::RolesItemDto;
-use crate::apps::users::users_dto::UsersCheckLoginDto;
-use crate::apps::users::users_repository::query_get_user_by_id;
+use crate::apps::v1::roles::roles_dto::RolesItemDto;
+use crate::apps::v1::users::users_dto::UsersCheckLoginDto;
+use crate::apps::v1::users::users_repository::query_get_user_by_id;
+
+use crate::get_version;
 use crate::libs::database::get_db;
 use crate::libs::database::schemas::app_roles_schema::{Column as RoleColumn, Entity as Role};
 use crate::libs::database::schemas::app_users_schema::{
     ActiveModel as UserActiveModel, Column as UserColumn, Entity as User,
 };
+use crate::libs::email::send_email;
 use crate::utils::error::AppError;
 use crate::utils::jwt::{encode_access_token, encode_refresh_token};
 use crate::utils::password::{hash_password, verify_password};
@@ -20,7 +22,10 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use serde_json::json;
 use uuid::Uuid;
 
-use super::auth_dto::AuthRegisterDto;
+use super::auth_dto::{
+    AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthRegisterRequestDto,
+    AuthResponseDto, AuthTokenItemDto,
+};
 
 pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLoginDto>, AppError> {
     let db: DatabaseConnection = get_db().await;
@@ -35,6 +40,7 @@ pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLog
             fullname: user.fullname,
             email: user.email,
             password: user.password,
+            is_active: user.is_active,
         };
 
         Ok(Json(user_detail))
@@ -59,7 +65,8 @@ async fn query_get_role_student_id(db: &DatabaseConnection) -> Result<RolesItemD
         .ok_or(AppError::NotFound)
 }
 
-pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
+pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Response {
+    let version = get_version().unwrap();
     if credentials.email.is_empty() || credentials.password.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
@@ -81,6 +88,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
     }
 
     let hashed_password = &user_response.password;
+    let is_active = &user_response.is_active;
 
     let is_password_valid =
         verify_password(&credentials.password, &hashed_password).unwrap_or(false);
@@ -93,27 +101,37 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginDto>) -> Response {
             .into_response();
     }
 
+    if !is_active {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "message": "Account is not active" })),
+        )
+            .into_response();
+    }
+
     let access_token = encode_access_token(user_response.email.clone()).unwrap();
     let refresh_token = encode_refresh_token(user_response.email.clone()).unwrap();
     let user_data = query_get_user_by_id(Uuid::parse_str(user_response.id.as_str()).unwrap())
         .await
         .unwrap();
 
-    let auth_response = AuthResponse {
+    let auth_response = AuthResponseDto {
         data: AuthDataDto {
-            token: AuthTokenDto {
+            token: AuthTokenItemDto {
                 access_token,
                 refresh_token,
             },
             user: user_data.data.clone(),
         },
+        version,
     };
 
     (StatusCode::OK, Json(auth_response)).into_response()
 }
 
-pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
+pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     let existing_user = User::find()
         .filter(UserColumn::Email.eq(new_user.email.clone()))
@@ -123,7 +141,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
     if let Ok(Some(_)) = existing_user {
         return (
             StatusCode::CONFLICT,
-            Json(json!({ "message": "User with this email already exists" })),
+            Json(json!({ "message": "User with this email already exists", "version": version })),
         )
             .into_response();
     }
@@ -131,7 +149,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
     if new_user.password.len() < 8 {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "message": "Password must be at least 8 characters long" })),
+            Json(json!({ "message": "Password must be at least 8 characters long", "version": version })),
         )
             .into_response();
     }
@@ -141,7 +159,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "message": "Email or password is invalid" })),
+                Json(json!({ "message": "Email or password is invalid", "version": version })),
             )
                 .into_response();
         }
@@ -173,16 +191,92 @@ pub async fn mutation_register(new_user: Json<AuthRegisterDto>) -> Response {
         updated_at: Set(Some(Utc::now())),
     };
 
+    send_email(
+        &new_user.email,
+        "Verification",
+        "Your Verification Code is 1234",
+    )
+    .unwrap();
+
     match active_model.insert(&db).await {
         Ok(_) => (
             StatusCode::CREATED,
-            Json(json!({ "message": "User created successfully" })),
+            Json(json!({ "message": "User created successfully", "version": version })),
         )
             .into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "message": "Failed to create user", "error": err.to_string() })),
+            Json(json!({ "message": "Failed to create user", "version": version, "error": err.to_string() })),
         )
             .into_response(),
     }
+}
+
+pub async fn mutation_forgot_password(Json(payload): Json<AuthForgotRequestDto>) -> Response {
+    let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
+
+    if payload.email.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Email is required", "version": version })),
+        )
+            .into_response();
+    }
+
+    let user = User::find()
+        .filter(UserColumn::Email.eq(payload.email.clone()))
+        .one(&db)
+        .await;
+
+    if let Ok(Some(user)) = user {
+        let reset_token = encode_access_token(user.email.clone()).unwrap();
+        send_email(&user.email, "Reset Password", &reset_token).unwrap();
+
+        return (
+            StatusCode::OK,
+            Json(json!({ "message": "Password reset token sent", "version": version, "reset_token": reset_token })),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "message": "User not found", "version": version })),
+    )
+        .into_response()
+}
+
+pub async fn mutation_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> Response {
+    let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
+
+    if payload.email.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Email is required", "version": version })),
+        )
+            .into_response();
+    }
+
+    let user = User::find()
+        .filter(UserColumn::Email.eq(payload.email.clone()))
+        .one(&db)
+        .await;
+
+    if let Ok(Some(user)) = user {
+        send_email(&user.email, "Verification", "Your OTP Code is 1234").unwrap();
+
+        return (
+            StatusCode::OK,
+            Json(json!({ "message": "OTP Has Been sent", "version": version,})),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "message": "User not found", "version": version })),
+    )
+        .into_response()
 }

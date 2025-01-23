@@ -1,5 +1,6 @@
-use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
 use axum::response::IntoResponse;
+
+use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
 
 use super::permissions_dto::{
     PermissionsDetailResponseDto, PermissionsListResponseDto, PermissionsRequestDto,
@@ -7,14 +8,14 @@ use super::permissions_dto::{
 
 #[utoipa::path(
     get,
-    path = "/api/permissions",
-    params(TMetaRequest),
+    path = "/v1/permissions",
+    params(MetaRequestDto),
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "List Permissions", body = PermissionsListResponseDto),
-        (status = 400, description = "Invalid Permissions data", body = MessageResponse)
+        (status = 400, description = "Invalid Permissions data", body = MessageResponseDto)
     ),
     tag = "Permissions"
 )]
@@ -25,13 +26,13 @@ pub async fn get_permissions() -> impl IntoResponse {
 
 #[utoipa::path(
     get,
-    path = "/api/permissions/detail/{id}",
+    path = "/v1/permissions/detail/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "Detail Permission", body = PermissionsDetailResponseDto),
-        (status = 400, description = "Invalid Permission data", body = MessageResponse)
+        (status = 400, description = "Invalid Permission data", body = MessageResponseDto)
     ),
     tag = "Permissions"
 )]
@@ -42,14 +43,14 @@ pub async fn get_detail_permission() -> impl IntoResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/permissions/create",
+    path = "/v1/permissions/create",
     request_body = PermissionsRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Permission Created", body = MessageResponse),
-        (status = 400, description = "Invalid Permission data", body = MessageResponse)
+        (status = 201, description = "Permission Created", body = MessageResponseDto),
+        (status = 400, description = "Invalid Permission data", body = MessageResponseDto)
     ),
     tag = "Permissions"
 )]
@@ -60,13 +61,13 @@ pub async fn post_create_permission() -> impl IntoResponse {
 
 #[utoipa::path(
     delete,
-    path = "/api/permissions/delete/{id}",
+    path = "/v1/permissions/delete/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Permission Deleted", body = MessageResponse),
-        (status = 400, description = "Invalid Permission data", body = MessageResponse)
+        (status = 201, description = "Permission Deleted", body = MessageResponseDto),
+        (status = 400, description = "Invalid Permission data", body = MessageResponseDto)
     ),
     tag = "Permissions"
 )]
@@ -77,14 +78,14 @@ pub async fn delete_permission() -> impl IntoResponse {
 
 #[utoipa::path(
     put,
-    path = "/api/permissions/update/{id}",
+    path = "/v1/permissions/update/{id}",
     request_body = PermissionsRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Permission Updated", body = MessageResponse),
-        (status = 400, description = "Invalid Permission data", body = MessageResponse)
+        (status = 201, description = "Permission Updated", body = MessageResponseDto),
+        (status = 400, description = "Invalid Permission data", body = MessageResponseDto)
     ),
     tag = "Permissions"
 )]

@@ -1,4 +1,4 @@
-use crate::{apps::roles::roles_dto::RolesItemDto, utils::meta::TMetaResponse};
+use crate::{apps::v1::roles::roles_dto::RolesItemDto, utils::dto::MetaResponseDto};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -66,15 +66,18 @@ pub struct UsersCheckLoginDto {
     pub fullname: String,
     pub email: String,
     pub password: String,
+    pub is_active: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UsersListResponseDto {
     pub data: Vec<UsersItemListDto>,
-    pub meta: Option<TMetaResponse>,
+    pub meta: Option<MetaResponseDto>,
+    pub version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UsersDetailResponseDto {
     pub data: UsersItemDto,
+    pub version: String,
 }

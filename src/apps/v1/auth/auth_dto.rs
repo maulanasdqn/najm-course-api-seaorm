@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
 
-use crate::apps::users::users_dto::UsersItemDto;
+use crate::apps::v1::users::users_dto::UsersItemDto;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
-pub struct AuthLoginDto {
+pub struct AuthLoginRequestDto {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
 
@@ -14,7 +14,7 @@ pub struct AuthLoginDto {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct AuthRegisterDto {
+pub struct AuthRegisterRequestDto {
     pub fullname: String,
     pub email: String,
     pub student_type: String,
@@ -25,20 +25,20 @@ pub struct AuthRegisterDto {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
-pub struct AuthForgotDto {
+pub struct AuthForgotRequestDto {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
-pub struct AuthVerifyEmailDto {
+pub struct AuthVerifyEmailRequestDto {
     #[validate(email(message = "Invalid email format"))]
     pub email: String,
     pub otp: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
-pub struct AuthRequestNewPasswordDto {
+pub struct AuthNewPasswordRequestDto {
     #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
     pub old_password: String,
     #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
@@ -46,28 +46,24 @@ pub struct AuthRequestNewPasswordDto {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AuthTokenDto {
+pub struct AuthTokenItemDto {
     pub access_token: String,
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AuthRefreshDto {
+pub struct AuthRefreshTokenRequestDto {
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthDataDto {
-    pub token: AuthTokenDto,
+    pub token: AuthTokenItemDto,
     pub user: UsersItemDto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AuthResponse {
+pub struct AuthResponseDto {
     pub data: AuthDataDto,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MessageResponse {
-    pub message: String,
+    pub version: String,
 }

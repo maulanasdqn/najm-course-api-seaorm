@@ -1,9 +1,10 @@
-use crate::{apps::auth::auth_dto::MessageResponse, utils::meta::TMetaRequest};
 use axum::{
     extract::{Path, Query},
     response::IntoResponse,
 };
 use uuid::Uuid;
+
+use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
 
 use super::{
     roles_dto::{RolesDetailResponseDto, RolesListResponseDto, RolesRequestDto},
@@ -12,31 +13,31 @@ use super::{
 
 #[utoipa::path(
     get,
-    path = "/api/roles",
-    params(TMetaRequest),
+    path = "/v1/roles",
+    params(MetaRequestDto),
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "List Roles", body = RolesListResponseDto),
-        (status = 400, description = "Invalid Roles data", body = MessageResponse)
+        (status = 400, description = "Invalid Roles data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]
 
-pub async fn get_roles(Query(params): Query<TMetaRequest>) -> impl IntoResponse {
+pub async fn get_roles(Query(params): Query<MetaRequestDto>) -> impl IntoResponse {
     query_get_roles(params).await
 }
 
 #[utoipa::path(
     get,
-    path = "/api/roles/detail/{id}",
+    path = "/v1/roles/detail/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
         (status = 201, description = "Detail Role", body = RolesDetailResponseDto),
-        (status = 400, description = "Invalid Role data", body = MessageResponse)
+        (status = 400, description = "Invalid Role data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]
@@ -47,14 +48,14 @@ pub async fn get_detail_role(Path(id): Path<Uuid>) -> impl IntoResponse {
 
 #[utoipa::path(
     post,
-    path = "/api/roles/create",
+    path = "/v1/roles/create",
     request_body = RolesRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Role Created", body = MessageResponse),
-        (status = 400, description = "Invalid Role data", body = MessageResponse)
+        (status = 201, description = "Role Created", body = MessageResponseDto),
+        (status = 400, description = "Invalid Role data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]
@@ -65,13 +66,13 @@ pub async fn post_create_role() -> impl IntoResponse {
 
 #[utoipa::path(
     delete,
-    path = "/api/roles/delete/{id}",
+    path = "/v1/roles/delete/{id}",
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Role Deleted", body = MessageResponse),
-        (status = 400, description = "Invalid Role data", body = MessageResponse)
+        (status = 201, description = "Role Deleted", body = MessageResponseDto),
+        (status = 400, description = "Invalid Role data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]
@@ -82,14 +83,14 @@ pub async fn delete_role() -> impl IntoResponse {
 
 #[utoipa::path(
     put,
-    path = "/api/roles/update/{id}",
+    path = "/v1/roles/update/{id}",
     request_body = RolesRequestDto,
     security(
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Role Updated", body = MessageResponse),
-        (status = 400, description = "Invalid Role data", body = MessageResponse)
+        (status = 201, description = "Role Updated", body = MessageResponseDto),
+        (status = 400, description = "Invalid Role data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]

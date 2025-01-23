@@ -1,14 +1,9 @@
-mod auth;
-mod permissions;
-mod roles;
-mod users;
+mod v1;
 
-use crate::utils::meta::{TMetaRequest, TMetaResponse};
-use auth::auth_middleware::authorization_middleware;
+use crate::utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto};
 use axum::{
     http::{header, HeaderValue, Method},
     middleware::from_fn,
-    response::Redirect,
     routing::get,
     Router,
 };
@@ -20,60 +15,58 @@ use utoipa::{
 };
 use utoipa_swagger_ui::SwaggerUi;
 
-
 pub async fn root_routes() -> Router {
     #[derive(OpenApi)]
     #[openapi(
         paths(
-            auth::auth_controller::post_login,
-            auth::auth_controller::post_register,
-            auth::auth_controller::post_forgot,
-            auth::auth_controller::post_verify_email,
-            auth::auth_controller::post_send_otp,
-            auth::auth_controller::post_new_password,
-            users::users_controller::get_users,
-            users::users_controller::get_detail_user,
-            users::users_controller::post_create_user,
-            users::users_controller::put_update_user,
-            users::users_controller::delete_user,
-            roles::roles_controller::get_roles,
-            roles::roles_controller::get_detail_role,
-            roles::roles_controller::post_create_role,
-            roles::roles_controller::put_update_role,
-            roles::roles_controller::delete_role,
-            permissions::permissions_controller::get_permissions,
-            permissions::permissions_controller::get_detail_permission,
-            permissions::permissions_controller::post_create_permission,
-            permissions::permissions_controller::put_update_permission,
-            permissions::permissions_controller::delete_permission
+            v1::auth::auth_controller::post_login,
+            v1::auth::auth_controller::post_register,
+            v1::auth::auth_controller::post_forgot,
+            v1::auth::auth_controller::post_verify_email,
+            v1::auth::auth_controller::post_send_otp,
+            v1::auth::auth_controller::post_new_password,
+            v1::users::users_controller::get_users,
+            v1::users::users_controller::get_detail_user,
+            v1::users::users_controller::post_create_user,
+            v1::users::users_controller::put_update_user,
+            v1::users::users_controller::delete_user,
+            v1::roles::roles_controller::get_roles,
+            v1::roles::roles_controller::get_detail_role,
+            v1::roles::roles_controller::post_create_role,
+            v1::roles::roles_controller::put_update_role,
+            v1::roles::roles_controller::delete_role,
+            v1::permissions::permissions_controller::get_permissions,
+            v1::permissions::permissions_controller::get_detail_permission,
+            v1::permissions::permissions_controller::post_create_permission,
+            v1::permissions::permissions_controller::put_update_permission,
+            v1::permissions::permissions_controller::delete_permission
         ),
         components(
             schemas(
-                TMetaResponse,
-                TMetaRequest,
-                auth::auth_dto::AuthLoginDto,
-                auth::auth_dto::AuthRegisterDto,
-                auth::auth_dto::AuthResponse,
-                auth::auth_dto::AuthTokenDto,
-                auth::auth_dto::AuthDataDto,
-                auth::auth_dto::AuthForgotDto,
-                auth::auth_dto::AuthVerifyEmailDto,
-                auth::auth_dto::AuthRequestNewPasswordDto,
-                auth::auth_dto::MessageResponse,
-                users::users_dto::UsersCreateRequestDto,
-                users::users_dto::UsersUpdateRequestDto,
-                users::users_dto::UsersListResponseDto,
-                users::users_dto::UsersDetailResponseDto,
-                users::users_dto::UsersItemDto,
-                roles::roles_dto::RolesItemDto,
-                roles::roles_dto::RolesRequestDto,
-                roles::roles_dto::RolesListResponseDto,
-                roles::roles_dto::RolesDetailResponseDto,
-                permissions::permissions_dto::PermissionsItemDto,
-                permissions::permissions_dto::PermissionsRequestDto,
-                permissions::permissions_dto::PermissionsListResponseDto,
-                permissions::permissions_dto::PermissionsDetailResponseDto
-                
+                MetaRequestDto,
+                MetaResponseDto,
+                MessageResponseDto,
+                v1::auth::auth_dto::AuthLoginRequestDto,
+                v1::auth::auth_dto::AuthRegisterRequestDto,
+                v1::auth::auth_dto::AuthResponseDto,
+                v1::auth::auth_dto::AuthTokenItemDto,
+                v1::auth::auth_dto::AuthDataDto,
+                v1::auth::auth_dto::AuthForgotRequestDto,
+                v1::auth::auth_dto::AuthVerifyEmailRequestDto,
+                v1::auth::auth_dto::AuthNewPasswordRequestDto,
+                v1::users::users_dto::UsersCreateRequestDto,
+                v1::users::users_dto::UsersUpdateRequestDto,
+                v1::users::users_dto::UsersListResponseDto,
+                v1::users::users_dto::UsersDetailResponseDto,
+                v1::users::users_dto::UsersItemDto,
+                v1::roles::roles_dto::RolesItemDto,
+                v1::roles::roles_dto::RolesRequestDto,
+                v1::roles::roles_dto::RolesListResponseDto,
+                v1::roles::roles_dto::RolesDetailResponseDto,
+                v1::permissions::permissions_dto::PermissionsItemDto,
+                v1::permissions::permissions_dto::PermissionsRequestDto,
+                v1::permissions::permissions_dto::PermissionsListResponseDto,
+                v1::permissions::permissions_dto::PermissionsDetailResponseDto
             )
         ),
         info(
@@ -128,23 +121,24 @@ pub async fn root_routes() -> Router {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true);
 
-    let public_routes = Router::new()
-        .nest("/auth", auth::auth_router())
-        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()));
+    let v1_public_routes = Router::new()
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .nest("/auth", v1::auth::auth_router());
 
-    let protected_routes =  Router::new()
-        .nest("/users",users::users_router())
-        .nest("/roles",roles::roles_router())
-        .nest("/permissions",permissions::permissions_router())
-        .layer(from_fn(authorization_middleware));
+    let v1_protected_routes = Router::new()
+        .nest("/users", v1::users::users_router())
+        .nest("/roles", v1::roles::roles_router())
+        .nest("/permissions", v1::permissions::permissions_router())
+        .layer(from_fn(v1::auth::auth_middleware::authorization_middleware));
 
-    let api_routes = Router::new()
-        .merge(public_routes)
-        .merge(protected_routes);
+    let v1_routes = Router::new()
+        .merge(v1_public_routes)
+        .merge(v1_protected_routes);
 
+    let v2_routes = Router::new().route("/", get(|| async { "Comming Soon" }));
 
     Router::new()
-        .route("/", get(|| async { Redirect::temporary("/api/docs") }))
-        .nest("/api", api_routes)
+        .nest("/v1", v1_routes)
+        .nest("/v2", v2_routes)
         .layer(cors_middleware)
 }

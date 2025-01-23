@@ -1,6 +1,7 @@
 use super::roles_dto::{RolesDetailResponseDto, RolesItemDto, RolesListResponseDto};
 use crate::{
-    apps::permissions::permissions_dto::PermissionsItemDto,
+    apps::v1::permissions::permissions_dto::PermissionsItemDto,
+    get_version,
     libs::database::{
         get_db,
         schemas::{
@@ -12,16 +13,17 @@ use crate::{
         },
     },
     utils::{
+        dto::{MetaRequestDto, MetaResponseDto},
         error::AppError,
-        meta::{TMetaRequest, TMetaResponse},
     },
 };
 use axum::Json;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter};
 use uuid::Uuid;
 
-pub async fn query_get_roles(params: TMetaRequest) -> Json<RolesListResponseDto> {
+pub async fn query_get_roles(params: MetaRequestDto) -> Json<RolesListResponseDto> {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(10).max(1).min(100);
@@ -45,16 +47,18 @@ pub async fn query_get_roles(params: TMetaRequest) -> Json<RolesListResponseDto>
 
     Json(RolesListResponseDto {
         data,
-        meta: TMetaResponse {
+        meta: MetaResponseDto {
             page: Some(page),
             per_page: Some(per_page),
             total: Some(total_items),
         },
+        version,
     })
 }
 
 pub async fn query_get_role_by_id(id: Uuid) -> Result<Json<RolesDetailResponseDto>, AppError> {
     let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
 
     let role = Role::find()
         .filter(RoleColumn::Id.eq(id))
@@ -85,5 +89,8 @@ pub async fn query_get_role_by_id(id: Uuid) -> Result<Json<RolesDetailResponseDt
         permissions,
     };
 
-    Ok(Json(RolesDetailResponseDto { data: role_detail }))
+    Ok(Json(RolesDetailResponseDto {
+        data: role_detail,
+        version,
+    }))
 }
