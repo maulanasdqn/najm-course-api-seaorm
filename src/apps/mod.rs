@@ -4,6 +4,7 @@ use crate::utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto};
 use axum::{
     http::{header, HeaderValue, Method},
     middleware::from_fn,
+    response::Redirect,
     routing::get,
     Router,
 };
@@ -121,9 +122,7 @@ pub async fn root_routes() -> Router {
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
         .allow_credentials(true);
 
-    let v1_public_routes = Router::new()
-        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
-        .nest("/auth", v1::auth::auth_router());
+    let v1_public_routes = Router::new().nest("/auth", v1::auth::auth_router());
 
     let v1_protected_routes = Router::new()
         .nest("/users", v1::users::users_router())
@@ -138,7 +137,9 @@ pub async fn root_routes() -> Router {
     let v2_routes = Router::new().route("/", get(|| async { "Comming Soon" }));
 
     Router::new()
+        .route("/", get(Redirect::to("/docs")))
         .nest("/v1", v1_routes)
         .nest("/v2", v2_routes)
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .layer(cors_middleware)
 }
