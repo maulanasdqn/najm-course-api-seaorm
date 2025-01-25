@@ -103,6 +103,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(AppUsers::StudentType).string().not_null())
                     .col(ColumnDef::new(AppUsers::IsActive).boolean().not_null())
                     .col(ColumnDef::new(AppUsers::IsDeleted).boolean().not_null())
+                    .col(ColumnDef::new(AppUsers::Otp).string()
                     .col(
                         ColumnDef::new(AppUsers::IsProfileCompleted)
                             .boolean()

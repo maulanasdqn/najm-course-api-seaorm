@@ -23,6 +23,7 @@ pub struct Model {
     pub is_active: bool,
     pub is_deleted: bool,
     pub is_profile_completed: bool,
+    pub otp: Option<String>,
     pub created_at: Option<DateTimeUtc>,
     pub updated_at: Option<DateTimeUtc>,
 }

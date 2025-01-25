@@ -1,7 +1,6 @@
 use crate::apps::v1::roles::roles_dto::RolesItemDto;
 use crate::apps::v1::users::users_dto::UsersCheckLoginDto;
 use crate::apps::v1::users::users_repository::query_get_user_by_id;
-
 use crate::get_version;
 use crate::libs::database::get_db;
 use crate::libs::database::schemas::app_roles_schema::{Column as RoleColumn, Entity as Role};
@@ -9,6 +8,7 @@ use crate::libs::database::schemas::app_users_schema::{
     ActiveModel as UserActiveModel, Column as UserColumn, Entity as User,
 };
 use crate::libs::email::send_email;
+use crate::libs::otp::OtpManager;
 use crate::utils::error::AppError;
 use crate::utils::jwt::{encode_access_token, encode_refresh_token};
 use crate::utils::password::{hash_password, verify_password};
@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use super::auth_dto::{
     AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthRegisterRequestDto,
-    AuthResponseDto, AuthTokenItemDto,
+    AuthResponseDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
 };
 
 pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLoginDto>, AppError> {
@@ -165,6 +165,9 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         }
     };
 
+    let otp_manager = OtpManager::new(300);
+    let otp = otp_manager.generate_otp(&new_user.email);
+
     let active_model = UserActiveModel {
         id: Set(Uuid::new_v4()),
         role_id: Set(
@@ -186,6 +189,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         is_deleted: Set(false),
         is_active: Set(false),
         is_profile_completed: Set(false),
+        otp: Set(Some(otp.clone())),
         student_type: Set(new_user.student_type.clone()),
         created_at: Set(Some(Utc::now())),
         updated_at: Set(Some(Utc::now())),
@@ -194,7 +198,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
     send_email(
         &new_user.email,
         "Verification",
-        "Your Verification Code is 1234",
+        &format!("Your OTP Code is {}", otp),
     )
     .unwrap();
 
@@ -265,7 +269,15 @@ pub async fn mutation_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> Res
         .await;
 
     if let Ok(Some(user)) = user {
-        send_email(&user.email, "Verification", "Your OTP Code is 1234").unwrap();
+        let otp_manager = OtpManager::new(300);
+        let otp = otp_manager.generate_otp(&user.email);
+
+        send_email(
+            &user.email,
+            "Verification",
+            &format!("Your OTP Code is {}", otp),
+        )
+        .unwrap();
 
         return (
             StatusCode::OK,
@@ -277,6 +289,59 @@ pub async fn mutation_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> Res
     (
         StatusCode::NOT_FOUND,
         Json(json!({ "message": "User not found", "version": version })),
+    )
+        .into_response()
+}
+
+pub async fn mutation_verify_email(Json(payload): Json<AuthVerifyEmailRequestDto>) -> Response {
+    let db: DatabaseConnection = get_db().await;
+    let version = get_version().unwrap();
+
+    if payload.email.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Email is required", "version": version })),
+        )
+            .into_response();
+    }
+
+    let otp_manager = OtpManager::new(300);
+    let is_valid = otp_manager.validate_otp(&payload.email, &payload.otp);
+
+    if is_valid {
+        if let Some(user) = User::find()
+            .filter(UserColumn::Email.eq(payload.email.clone()))
+            .one(&db)
+            .await
+            .unwrap()
+        {
+            let mut active_user: UserActiveModel = user.into();
+            active_user.is_active = Set(true);
+            active_user.otp = Set(None);
+
+            if let Err(err) = active_user.update(&db).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({
+                        "message": "Failed to update user status",
+                        "version": version,
+                        "error": err.to_string()
+                    })),
+                )
+                    .into_response();
+            }
+
+            return (
+                StatusCode::OK,
+                Json(json!({ "message": "Email successfully verified", "version": version })),
+            )
+                .into_response();
+        }
+    }
+
+    (
+        StatusCode::BAD_REQUEST,
+        Json(json!({ "message": "Invalid OTP", "version": version })),
     )
         .into_response()
 }

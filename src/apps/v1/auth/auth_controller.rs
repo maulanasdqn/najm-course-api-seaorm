@@ -7,6 +7,7 @@ use super::{
     },
     auth_repository::{
         mutation_forgot_password, mutation_login, mutation_register, mutation_send_otp,
+        mutation_verify_email,
     },
 };
 use axum::{extract::Json, response::IntoResponse};
@@ -24,6 +25,21 @@ use axum::{extract::Json, response::IntoResponse};
 
 pub async fn post_login(Json(payload): Json<AuthLoginRequestDto>) -> impl IntoResponse {
     mutation_login(Json(payload)).await
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/register",
+    request_body = AuthRegisterRequestDto,
+    responses(
+        (status = 200, description = "Register successful", body = MessageResponseDto),
+        (status = 401, description = "Unauthorized", body = MessageResponseDto)
+    ),
+    tag = "Authentication"
+)]
+
+pub async fn post_register(Json(payload): Json<AuthRegisterRequestDto>) -> impl IntoResponse {
+    mutation_register(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -82,21 +98,8 @@ pub async fn post_new_password() -> impl IntoResponse {
     tag = "Authentication"
 )]
 
-pub async fn post_verify_email() -> impl IntoResponse {
-    ()
-}
-
-#[utoipa::path(
-    post,
-    path = "/v1/auth/register",
-    request_body = AuthRegisterRequestDto,
-    responses(
-        (status = 200, description = "Register successful", body = MessageResponseDto),
-        (status = 401, description = "Unauthorized", body = MessageResponseDto)
-    ),
-    tag = "Authentication"
-)]
-
-pub async fn post_register(Json(payload): Json<AuthRegisterRequestDto>) -> impl IntoResponse {
-    mutation_register(Json(payload)).await
+pub async fn post_verify_email(
+    Json(payload): Json<AuthVerifyEmailRequestDto>,
+) -> impl IntoResponse {
+    mutation_verify_email(Json(payload)).await
 }
