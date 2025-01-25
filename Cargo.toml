@@ -28,3 +28,7 @@ lettre = { version = "0.11.11", features = ["tokio1-native-tls", "tokio1-rustls-
 rand = "0.8.5"
 redis = "0.28.1"
 
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
