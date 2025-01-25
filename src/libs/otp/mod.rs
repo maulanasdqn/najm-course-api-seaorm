@@ -1,45 +1,52 @@
-use rand::Rng;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use rand::{thread_rng, Rng};
+use redis::Commands;
+use std::time::Duration;
 
-#[derive(Clone)]
 pub struct OtpManager {
-    otps: Arc<Mutex<HashMap<String, (String, SystemTime)>>>,
     ttl: Duration,
 }
 
 impl OtpManager {
     pub fn new(ttl_secs: u64) -> Self {
         OtpManager {
-            otps: Arc::new(Mutex::new(HashMap::new())),
             ttl: Duration::from_secs(ttl_secs),
         }
     }
 
-    pub fn generate_otp(&self, identifier: &str) -> String {
-        let otp: String = rand::thread_rng()
+    pub fn generate_otp(&self, mut redis_conn: redis::Connection, identifier: &str) -> String {
+        let otp: String = thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(6)
             .map(char::from)
             .collect();
 
-        let mut otps = self.otps.lock().unwrap();
-        otps.insert(identifier.to_string(), (otp.clone(), SystemTime::now()));
+        let key = format!("otp:{}", identifier);
+        let _: &() = &redis_conn
+            .set_ex(
+                key.clone(),
+                otp.clone(),
+                (self.ttl.as_secs() as usize).try_into().unwrap(),
+            )
+            .expect("Failed to store OTP in Redis");
 
         otp
     }
 
-    pub fn validate_otp(&self, identifier: &str, otp: &str) -> bool {
-        let mut otps = self.otps.lock().unwrap();
-
-        if let Some((stored_otp, timestamp)) = otps.get(identifier) {
-            if stored_otp == otp && timestamp.elapsed().unwrap_or_default() <= self.ttl {
-                otps.remove(identifier);
+    pub fn validate_otp(
+        &self,
+        mut redis_conn: redis::Connection,
+        identifier: &str,
+        otp: &str,
+    ) -> bool {
+        let key = format!("otp:{}", identifier);
+        if let Ok(stored_otp) = redis_conn.get::<_, String>(&key) {
+            if stored_otp == otp {
+                let _: () = redis_conn
+                    .del(&key)
+                    .expect("Failed to delete OTP from Redis");
                 return true;
             }
         }
-
         false
     }
 }

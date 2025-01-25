@@ -1,3 +1,5 @@
+use std::env;
+
 use crate::apps::v1::roles::roles_dto::RolesItemDto;
 use crate::apps::v1::users::users_dto::UsersCheckLoginDto;
 use crate::apps::v1::users::users_repository::query_get_user_by_id;
@@ -9,8 +11,9 @@ use crate::libs::database::schemas::app_users_schema::{
 };
 use crate::libs::email::send_email;
 use crate::libs::otp::OtpManager;
+use crate::libs::redis::connect_redis;
 use crate::utils::error::AppError;
-use crate::utils::jwt::{encode_access_token, encode_refresh_token};
+use crate::utils::jwt::{decode_access_token, encode_access_token, encode_refresh_token};
 use crate::utils::password::{hash_password, verify_password};
 use axum::{
     http::StatusCode,
@@ -18,13 +21,14 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use redis::Commands;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
 
 use super::auth_dto::{
-    AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthRegisterRequestDto,
-    AuthResponseDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
+    AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
+    AuthRegisterRequestDto, AuthResponseDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
 };
 
 pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLoginDto>, AppError> {
@@ -75,14 +79,29 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
             .into_response();
     }
 
-    let user_response = query_get_user_by_email(credentials.email.clone())
-        .await
-        .unwrap();
+    let user_response = match query_get_user_by_email(credentials.email.clone()).await {
+        Ok(user) => user,
+        Err(_) => Json(UsersCheckLoginDto {
+            id: "".to_string(),
+            fullname: "".to_string(),
+            email: "".to_string(),
+            password: "".to_string(),
+            is_active: false,
+        }),
+    };
+
+    if user_response.id.eq(&"".to_string()) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "message": "Email or password invalid", "version": version })),
+        )
+            .into_response();
+    }
 
     if user_response.email.is_empty() {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "message": "Account not found" })),
+            Json(json!({ "message": "Email or password invalid", "version": version })),
         )
             .into_response();
     }
@@ -96,7 +115,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
     if !is_password_valid {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "message": "Invalid credentials" })),
+            Json(json!({ "message": "Email or password invalid", "version": version })),
         )
             .into_response();
     }
@@ -104,7 +123,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
     if !is_active {
         return (
             StatusCode::UNAUTHORIZED,
-            Json(json!({ "message": "Account is not active" })),
+            Json(json!({ "message": "Your Account is not active, please contact admin", "version": version })),
         )
             .into_response();
     }
@@ -165,8 +184,10 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         }
     };
 
+    let redis = connect_redis();
+
     let otp_manager = OtpManager::new(300);
-    let otp = otp_manager.generate_otp(&new_user.email);
+    let otp = otp_manager.generate_otp(redis, &new_user.email);
 
     let active_model = UserActiveModel {
         id: Set(Uuid::new_v4()),
@@ -233,12 +254,65 @@ pub async fn mutation_forgot_password(Json(payload): Json<AuthForgotRequestDto>)
         .await;
 
     if let Ok(Some(user)) = user {
-        let reset_token = encode_access_token(user.email.clone()).unwrap();
-        send_email(&user.email, "Reset Password", &reset_token).unwrap();
+        let mut redis = connect_redis();
+
+        let reset_token = match encode_access_token(user.email.clone()) {
+            Ok(token) => token,
+            Err(_) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        json!({ "message": "Failed to generate reset token", "version": version }),
+                    ),
+                )
+                    .into_response();
+            }
+        };
+
+        let redis_key = format!("reset_password:{}", user.email);
+
+        if let Err(err) = redis.set_ex::<_, _, ()>(
+            &redis_key,
+            reset_token.clone(),
+            (3600 * 24).try_into().unwrap_or(86400),
+        ) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "message": "Failed to store reset token",
+                    "version": version,
+                    "error": err.to_string()
+                })),
+            )
+                .into_response();
+        }
+
+        let fe_url = match env::var("FE_URL") {
+            Ok(url) => url,
+            Err(_) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "message": "Frontend URL not configured", "version": version })),
+                )
+                    .into_response();
+            }
+        };
+        let email_content = format!(
+            "You have requested a password reset. Please click the link below to continue: {}/auth/reset-password?token={}",
+            fe_url, reset_token
+        );
+
+        if let Err(err) = send_email(&user.email, "Reset Password Request", &email_content) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "message": "Failed to send reset email", "version": version, "error": err.to_string() })),
+            )
+            .into_response();
+        }
 
         return (
             StatusCode::OK,
-            Json(json!({ "message": "Password reset token sent", "version": version, "reset_token": reset_token })),
+            Json(json!({ "message": "Password reset token sent", "version": version })),
         )
             .into_response();
     }
@@ -268,8 +342,9 @@ pub async fn mutation_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> Res
         .await;
 
     if let Ok(Some(user)) = user {
+        let redis = connect_redis();
         let otp_manager = OtpManager::new(300);
-        let otp = otp_manager.generate_otp(&user.email);
+        let otp = otp_manager.generate_otp(redis, &user.email);
 
         send_email(
             &user.email,
@@ -304,8 +379,9 @@ pub async fn mutation_verify_email(Json(payload): Json<AuthVerifyEmailRequestDto
             .into_response();
     }
 
+    let redis = connect_redis();
     let otp_manager = OtpManager::new(300);
-    let is_valid = otp_manager.validate_otp(&payload.email, &payload.otp);
+    let is_valid = otp_manager.validate_otp(redis, &payload.email, &payload.otp);
 
     if is_valid {
         if let Some(user) = User::find()
@@ -340,6 +416,91 @@ pub async fn mutation_verify_email(Json(payload): Json<AuthVerifyEmailRequestDto
     (
         StatusCode::BAD_REQUEST,
         Json(json!({ "message": "Invalid OTP", "version": version })),
+    )
+        .into_response()
+}
+
+pub async fn mutation_new_password(Json(payload): Json<AuthNewPasswordRequestDto>) -> Response {
+    let db: DatabaseConnection = get_db().await;
+    let mut redis = connect_redis();
+    let version = get_version().unwrap();
+
+    if payload.token.is_empty() || payload.password.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Token and password are required", "version": version })),
+        )
+            .into_response();
+    }
+
+    if payload.password.len() < 8 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Password must be at least 8 characters long", "version": version })),
+        )
+        .into_response();
+    }
+
+    let tok = decode_access_token(payload.token.clone());
+
+    let email = tok.unwrap().claims.email;
+    let key = format!("reset_password:{}", email);
+
+    let stored_token: Option<String> = redis.get(&key).ok();
+
+    if stored_token.as_deref() != Some(&payload.token) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Invalid or expired reset token", "version": version })),
+        )
+            .into_response();
+    }
+
+    let hashed_password = match hash_password(&payload.password) {
+        Ok(hash) => hash,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "message": "Failed to hash the password", "version": version })),
+            )
+                .into_response();
+        }
+    };
+
+    if let Some(user) = User::find()
+        .filter(UserColumn::Email.eq(email.clone()))
+        .one(&db)
+        .await
+        .ok()
+        .flatten()
+    {
+        let mut active_user: UserActiveModel = user.into();
+        active_user.password = Set(hashed_password);
+
+        if let Err(err) = active_user.update(&db).await {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "message": "Failed to update user password",
+                    "version": version,
+                    "error": err.to_string()
+                })),
+            )
+                .into_response();
+        }
+
+        let _: () = redis.del(&key).unwrap_or(());
+
+        return (
+            StatusCode::OK,
+            Json(json!({ "message": "Password updated successfully", "version": version })),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({ "message": "User not found", "version": version })),
     )
         .into_response()
 }

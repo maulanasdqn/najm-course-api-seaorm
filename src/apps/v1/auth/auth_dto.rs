@@ -40,9 +40,9 @@ pub struct AuthVerifyEmailRequestDto {
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct AuthNewPasswordRequestDto {
     #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
-    pub old_password: String,
-    #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
     pub password: String,
+    #[validate(length(min = 1, message = "Token is required"))]
+    pub token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

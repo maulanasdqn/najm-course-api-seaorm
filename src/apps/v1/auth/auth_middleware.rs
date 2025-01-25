@@ -13,7 +13,7 @@ use std::convert::Infallible;
 
 use super::auth_repository::query_get_user_by_email;
 
-fn format_error(message: String) -> Response<Body> {
+pub fn format_error(message: String) -> Response<Body> {
     let error_body = json!({
         "message": message
     });

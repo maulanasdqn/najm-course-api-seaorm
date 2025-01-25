@@ -6,8 +6,8 @@ use super::{
         AuthRegisterRequestDto, AuthResponseDto, AuthVerifyEmailRequestDto,
     },
     auth_repository::{
-        mutation_forgot_password, mutation_login, mutation_register, mutation_send_otp,
-        mutation_verify_email,
+        mutation_forgot_password, mutation_login, mutation_new_password, mutation_register,
+        mutation_send_otp, mutation_verify_email,
     },
 };
 use axum::{extract::Json, response::IntoResponse};
@@ -83,8 +83,10 @@ pub async fn post_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> impl In
     tag = "Authentication"
 )]
 
-pub async fn post_new_password() -> impl IntoResponse {
-    ()
+pub async fn post_new_password(
+    Json(payload): Json<AuthNewPasswordRequestDto>,
+) -> impl IntoResponse {
+    mutation_new_password(Json(payload)).await
 }
 
 #[utoipa::path(
