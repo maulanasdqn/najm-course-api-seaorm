@@ -64,7 +64,6 @@ pub async fn mutation_create_users(
         is_active: Set(false),
         is_profile_completed: Set(false),
         student_type: Set(new_user.student_type.clone()),
-        otp: Set(None),
         created_at: Set(Some(Utc::now())),
         updated_at: Set(Some(Utc::now())),
     };

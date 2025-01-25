@@ -189,7 +189,6 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         is_deleted: Set(false),
         is_active: Set(false),
         is_profile_completed: Set(false),
-        otp: Set(Some(otp.clone())),
         student_type: Set(new_user.student_type.clone()),
         created_at: Set(Some(Utc::now())),
         updated_at: Set(Some(Utc::now())),
@@ -317,7 +316,6 @@ pub async fn mutation_verify_email(Json(payload): Json<AuthVerifyEmailRequestDto
         {
             let mut active_user: UserActiveModel = user.into();
             active_user.is_active = Set(true);
-            active_user.otp = Set(None);
 
             if let Err(err) = active_user.update(&db).await {
                 return (
