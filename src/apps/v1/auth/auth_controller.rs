@@ -1,13 +1,15 @@
+use crate::apps::v1::auth::auth_dto::AuthRefreshTokenResponseDto;
 use crate::utils::dto::MessageResponseDto;
 
 use super::{
     auth_dto::{
         AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
-        AuthRegisterRequestDto, AuthResponseDto, AuthVerifyEmailRequestDto,
+        AuthRefreshTokenRequestDto, AuthRegisterRequestDto, AuthResponseDto,
+        AuthVerifyEmailRequestDto,
     },
     auth_repository::{
-        mutation_forgot_password, mutation_login, mutation_new_password, mutation_register,
-        mutation_send_otp, mutation_verify_email,
+        mutation_forgot_password, mutation_login, mutation_new_password, mutation_refresh,
+        mutation_register, mutation_send_otp, mutation_verify_email,
     },
 };
 use axum::{extract::Json, response::IntoResponse};
@@ -104,4 +106,19 @@ pub async fn post_verify_email(
     Json(payload): Json<AuthVerifyEmailRequestDto>,
 ) -> impl IntoResponse {
     mutation_verify_email(Json(payload)).await
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/auth/refresh",
+    request_body = AuthRefreshTokenRequestDto,
+    responses(
+        (status = 200, description = "Refresh successful", body = AuthRefreshTokenResponseDto),
+        (status = 401, description = "Unauthorized", body = MessageResponseDto)
+    ),
+    tag = "Authentication"
+)]
+
+pub async fn post_refresh(Json(payload): Json<AuthRefreshTokenRequestDto>) -> impl IntoResponse {
+    mutation_refresh(Json(payload)).await
 }

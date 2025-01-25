@@ -5,6 +5,7 @@ use axum::{
 
 pub mod permissions_controller;
 pub mod permissions_dto;
+pub mod permissions_middleware;
 pub mod permissions_repository;
 
 pub fn permissions_router() -> Router {

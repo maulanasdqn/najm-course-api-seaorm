@@ -67,3 +67,9 @@ pub struct AuthResponseDto {
     pub data: AuthDataDto,
     pub version: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AuthRefreshTokenResponseDto {
+    pub data: AuthTokenItemDto,
+    pub version: String,
+}

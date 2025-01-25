@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, Query},
     response::IntoResponse,
+    Json,
 };
 use uuid::Uuid;
 
@@ -8,7 +9,7 @@ use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
 
 use super::{
     roles_dto::{RolesDetailResponseDto, RolesListResponseDto, RolesRequestDto},
-    roles_repository::{query_get_role_by_id, query_get_roles},
+    roles_repository::{mutation_create_role, query_get_role_by_id, query_get_roles},
 };
 
 #[utoipa::path(
@@ -60,8 +61,8 @@ pub async fn get_detail_role(Path(id): Path<Uuid>) -> impl IntoResponse {
     tag = "Roles"
 )]
 
-pub async fn post_create_role() -> impl IntoResponse {
-    ()
+pub async fn post_create_role(Json(payload): Json<RolesRequestDto>) -> impl IntoResponse {
+    mutation_create_role(Json(payload)).await
 }
 
 #[utoipa::path(

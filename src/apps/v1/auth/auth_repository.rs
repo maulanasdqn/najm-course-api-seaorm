@@ -13,7 +13,9 @@ use crate::libs::email::send_email;
 use crate::libs::otp::OtpManager;
 use crate::libs::redis::connect_redis;
 use crate::utils::error::AppError;
-use crate::utils::jwt::{decode_access_token, encode_access_token, encode_refresh_token};
+use crate::utils::jwt::{
+    decode_access_token, decode_refresh_token, encode_access_token, encode_refresh_token,
+};
 use crate::utils::password::{hash_password, verify_password};
 use axum::{
     http::StatusCode,
@@ -28,7 +30,8 @@ use uuid::Uuid;
 
 use super::auth_dto::{
     AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
-    AuthRegisterRequestDto, AuthResponseDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
+    AuthRefreshTokenRequestDto, AuthRefreshTokenResponseDto, AuthRegisterRequestDto,
+    AuthResponseDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
 };
 
 pub async fn query_get_user_by_email(email: String) -> Result<Json<UsersCheckLoginDto>, AppError> {
@@ -528,4 +531,62 @@ pub async fn mutation_new_password(Json(payload): Json<AuthNewPasswordRequestDto
         Json(json!({ "message": "User not found", "version": version })),
     )
         .into_response()
+}
+
+pub async fn mutation_refresh(Json(payload): Json<AuthRefreshTokenRequestDto>) -> Response {
+    let version = get_version().unwrap();
+
+    if payload.refresh_token.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "message": "Refresh token is required", "version": version })),
+        )
+            .into_response();
+    }
+
+    let token_data = match decode_refresh_token(payload.refresh_token.clone()) {
+        Ok(data) => data,
+        Err(_) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "message": "Invalid or expired refresh token", "version": version })),
+            )
+                .into_response();
+        }
+    };
+
+    let email = token_data.claims.email;
+
+    let new_access_token = match encode_access_token(email.clone()) {
+        Ok(token) => token,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "message": "Failed to generate access token", "version": version })),
+            )
+                .into_response();
+        }
+    };
+
+    let new_refresh_token = match encode_refresh_token(email.clone()) {
+        Ok(token) => token,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "message": "Failed to generate refresh token", "version": version })),
+            )
+                .into_response();
+        }
+    };
+
+    let auth_response = AuthRefreshTokenResponseDto {
+        data: AuthTokenItemDto {
+            access_token: new_access_token,
+            refresh_token: new_refresh_token,
+        },
+
+        version,
+    };
+
+    (StatusCode::OK, Json(auth_response)).into_response()
 }

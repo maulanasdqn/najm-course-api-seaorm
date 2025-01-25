@@ -8,6 +8,7 @@ use crate::{
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct RolesRequestDto {
     pub name: String,
+    pub permissions: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
