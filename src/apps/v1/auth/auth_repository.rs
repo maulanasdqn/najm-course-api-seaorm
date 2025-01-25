@@ -416,6 +416,7 @@ pub async fn mutation_verify_email(Json(payload): Json<AuthVerifyEmailRequestDto
         {
             let mut active_user: UserActiveModel = user.into();
             active_user.is_active = Set(true);
+            active_user.email_verified = Set(Some(Utc::now()));
 
             if let Err(err) = active_user.update(&db).await {
                 return (
