@@ -27,6 +27,12 @@ jobs:
             echo "Pulling latest changes..."
             cd /root/najm-course-api
             git pull origin main
+
+            echo "Apply .env"
+            export $(cat /etc/.env/najm-course-api/.env | xargs)
+
+            echo "Apply Migrations..."
+            sea-orm-cli migrate up
             
             echo "Building the application..."
             cargo build --release
