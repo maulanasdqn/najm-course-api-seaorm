@@ -150,14 +150,23 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
 
 pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
-    let existing_user = User::find()
+    let version = match get_version() {
+        Ok(ver) => ver,
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "message": "Failed to fetch application version" })),
+            )
+                .into_response();
+        }
+    };
+
+    if let Ok(Some(_)) = User::find()
         .filter(UserColumn::Email.eq(new_user.email.clone()))
         .one(&db)
-        .await;
-
-    if let Ok(Some(_)) = existing_user {
+        .await
+    {
         return (
             StatusCode::CONFLICT,
             Json(json!({ "message": "User with this email already exists", "version": version })),
@@ -170,7 +179,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
             StatusCode::BAD_REQUEST,
             Json(json!({ "message": "Password must be at least 8 characters long", "version": version })),
         )
-            .into_response();
+        .into_response();
     }
 
     let hashed_password = match hash_password(&new_user.password) {
@@ -178,7 +187,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "message": "Email or password is invalid", "version": version })),
+                Json(json!({ "message": "Failed to hash the password", "version": version })),
             )
                 .into_response();
         }
@@ -189,24 +198,26 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
     let otp_manager = OtpManager::new(300);
     let otp = otp_manager.generate_otp(redis, &new_user.email);
 
+    let role_id = match query_get_role_student_id(&db).await {
+        Ok(role) => Uuid::parse_str(&role.id).unwrap_or(Uuid::new_v4()),
+        Err(_) => Uuid::new_v4(),
+    };
+
     let active_model = UserActiveModel {
         id: Set(Uuid::new_v4()),
-        role_id: Set(
-            Uuid::parse_str(query_get_role_student_id(&db).await.unwrap().id.as_str())
-                .unwrap_or(Uuid::new_v4()),
-        ),
+        role_id: Set(role_id),
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
-        email_verified: Set(Some(Utc::now())),
-        avatar: Set(Some("".to_string())),
+        email_verified: Set(None),
+        avatar: Set(None),
         phone_number: Set(new_user.phone_number.clone()),
         password: Set(hashed_password),
         referral_code: Set(new_user.referral_code.clone()),
         referred_by: Set(new_user.referred_by.clone()),
-        birth_date: Set(Some(Utc::now())),
-        gender: Set(Some("".to_string())),
-        religion: Set(Some("".to_string())),
-        identity_number: Set(Some("".to_string())),
+        birth_date: Set(None),
+        gender: Set(None),
+        religion: Set(None),
+        identity_number: Set(None),
         is_deleted: Set(false),
         is_active: Set(false),
         is_profile_completed: Set(false),
@@ -215,12 +226,21 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         updated_at: Set(Some(Utc::now())),
     };
 
-    send_email(
+    if let Err(err) = send_email(
         &new_user.email,
         "Verification",
         &format!("Your OTP Code is {}", otp),
-    )
-    .unwrap();
+    ) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "message": "Failed to send verification email",
+                "version": version,
+                "error": err.to_string()
+            })),
+        )
+            .into_response();
+    }
 
     match active_model.insert(&db).await {
         Ok(_) => (
@@ -230,7 +250,11 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
             .into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "message": "Failed to create user", "version": version, "error": err.to_string() })),
+            Json(json!({
+                "message": "Failed to create user in the database",
+                "version": version,
+                "error": err.to_string()
+            })),
         )
             .into_response(),
     }
