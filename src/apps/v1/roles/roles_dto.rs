@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 use crate::{
     apps::v1::permissions::permissions_dto::PermissionsItemDto, utils::dto::MetaResponseDto,
@@ -18,6 +19,11 @@ pub struct RolesItemDto {
     pub permissions: Vec<PermissionsItemDto>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RolesIdOnlyDto {
+    pub id: Uuid,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

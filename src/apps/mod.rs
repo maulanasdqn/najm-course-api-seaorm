@@ -1,6 +1,9 @@
-mod v1;
+pub mod v1;
 
-use crate::utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto};
+use crate::{
+    utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto},
+    ResponseSuccessDto,
+};
 use axum::{
     http::{header, HeaderValue, Method},
     middleware::from_fn,
@@ -15,6 +18,7 @@ use utoipa::{
     Modify, OpenApi,
 };
 use utoipa_swagger_ui::SwaggerUi;
+use v1::auth::{AuthDataDto, AuthTokenItemDto};
 
 pub async fn root_routes() -> Router {
     #[derive(OpenApi)]
@@ -48,16 +52,16 @@ pub async fn root_routes() -> Router {
                 MetaRequestDto,
                 MetaResponseDto,
                 MessageResponseDto,
+                ResponseSuccessDto<AuthTokenItemDto>,
+                ResponseSuccessDto<AuthDataDto>,
                 v1::auth::auth_dto::AuthLoginRequestDto,
                 v1::auth::auth_dto::AuthRegisterRequestDto,
-                v1::auth::auth_dto::AuthResponseDto,
                 v1::auth::auth_dto::AuthTokenItemDto,
                 v1::auth::auth_dto::AuthDataDto,
                 v1::auth::auth_dto::AuthForgotRequestDto,
                 v1::auth::auth_dto::AuthVerifyEmailRequestDto,
                 v1::auth::auth_dto::AuthNewPasswordRequestDto,
                 v1::auth::auth_dto::AuthRefreshTokenRequestDto,
-                v1::auth::auth_dto::AuthRefreshTokenResponseDto,
                 v1::users::users_dto::UsersCreateRequestDto,
                 v1::users::users_dto::UsersUpdateRequestDto,
                 v1::users::users_dto::UsersListResponseDto,
@@ -111,7 +115,11 @@ pub async fn root_routes() -> Router {
         Ok("production") => {
             vec!["https://najmcourse.com", "https://cat.najmcourse.com"]
         }
-        _ => vec!["https://najmcourse.com", "https://cat.najmcourse.com"],
+        _ => vec![
+            "http://localhost:5173",
+            "https://najmcourse.com",
+            "https://cat.najmcourse.com",
+        ],
     };
 
     let allowed_origins: Vec<HeaderValue> = cors_origins

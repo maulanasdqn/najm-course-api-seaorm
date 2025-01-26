@@ -1,12 +1,10 @@
 use axum::{
     extract::{Path, Query},
-    http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use uuid::Uuid;
 
-use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
+use crate::{MessageResponseDto, MetaRequestDto};
 
 use super::{
     users_dto::{
@@ -47,13 +45,7 @@ pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
 )]
 
 pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
-    match Uuid::parse_str(&id) {
-        Ok(uuid) => match query_get_user_by_id(uuid).await {
-            Ok(response) => response.into_response(),
-            Err(err) => err.into_response(),
-        },
-        Err(_) => (StatusCode::BAD_REQUEST, "Invalid UUID format").into_response(),
-    }
+    query_get_user_by_id(id).await
 }
 
 #[utoipa::path(

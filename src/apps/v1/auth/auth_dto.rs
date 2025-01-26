@@ -1,8 +1,7 @@
+use crate::users::UsersItemDto;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
-
-use crate::apps::v1::users::users_dto::UsersItemDto;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct AuthLoginRequestDto {
@@ -13,11 +12,18 @@ pub struct AuthLoginRequestDto {
     pub password: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Validate)]
 pub struct AuthRegisterRequestDto {
+    #[validate(length(min = 1, message = "Fullname is required"))]
     pub fullname: String,
+    #[validate(
+        email(message = "Invalid email format"),
+        length(min = 1, message = "Email is required")
+    )]
     pub email: String,
+    #[validate(length(min = 1, message = "Student type is required"))]
     pub student_type: String,
+    #[validate(length(min = 1, message = "Phone number type is required"))]
     pub phone_number: String,
     pub password: String,
     pub referral_code: Option<String>,
@@ -60,16 +66,4 @@ pub struct AuthRefreshTokenRequestDto {
 pub struct AuthDataDto {
     pub token: AuthTokenItemDto,
     pub user: UsersItemDto,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AuthResponseDto {
-    pub data: AuthDataDto,
-    pub version: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct AuthRefreshTokenResponseDto {
-    pub data: AuthTokenItemDto,
-    pub version: String,
 }

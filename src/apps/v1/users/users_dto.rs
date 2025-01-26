@@ -62,9 +62,6 @@ pub struct UsersItemListDto {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UsersCheckLoginDto {
-    pub id: String,
-    pub fullname: String,
-    pub email: String,
     pub password: String,
     pub is_active: bool,
 }

@@ -7,7 +7,6 @@ edition = "2021"
 argon2 = { version = "0.5.3", features = ["password-hash"] }
 axum = "0.8.1"
 chrono = { version = "0.4.39", features = ["serde"] }
-dotenv = "0.15.0"
 jsonwebtoken = "9.3.0"
 log = "0.4.25"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
@@ -15,7 +14,6 @@ sea-orm = { version = "1.1.4", features = [ "sqlx-postgres", "macros", "with-jso
 sea-orm-migration = { version = "1.1.0", features = ["sqlx-postgres", "runtime-tokio", "runtime-tokio-native-tls"] }
 serde = "1.0.217"
 serde_json = "1.0.134"
-thiserror = "2.0.9"
 tokio = { version = "1.42.0", features = ["full"] }
 uuid = { version = "1.11.0", features = ["v4"] }
 validator = { version = "0.19.0", features = ["derive"] }
@@ -27,8 +25,10 @@ toml = "0.8.19"
 lettre = { version = "0.11.11", features = ["tokio1-native-tls", "tokio1-rustls-tls"] }
 rand = "0.8.5"
 redis = "0.28.1"
+thiserror = "2.0.11"
 
 [profile.release]
-lto = true
+lto = "fat"
 codegen-units = 1
 panic = "abort"
+opt-level = "z"

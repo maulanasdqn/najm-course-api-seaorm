@@ -8,6 +8,8 @@ pub mod permissions_dto;
 pub mod permissions_middleware;
 pub mod permissions_repository;
 
+pub use permissions_dto::*;
+
 pub fn permissions_router() -> Router {
     Router::new()
         .route("/", get(permissions_controller::get_permissions))

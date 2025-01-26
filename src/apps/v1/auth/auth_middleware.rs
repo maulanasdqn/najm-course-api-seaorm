@@ -1,4 +1,3 @@
-use crate::utils::jwt::decode_access_token;
 use axum::{
     body::Body,
     extract::Request,
@@ -11,7 +10,7 @@ use axum::{
 use serde_json::json;
 use std::convert::Infallible;
 
-use super::auth_repository::query_get_user_by_email;
+use crate::{decode_access_token, users::query_get_user_by_email};
 
 pub fn format_error(message: String) -> Response<Body> {
     let error_body = json!({
@@ -64,7 +63,7 @@ pub async fn authorization_middleware(
     let user_response = query_get_user_by_email(token_data.claims.email)
         .await
         .unwrap();
-    if user_response.email.is_empty() {
+    if user_response.data.email.is_empty() {
         return Ok(format_error("Unauthorized user".to_string()));
     }
 

@@ -1,17 +1,12 @@
-use crate::apps::v1::auth::auth_dto::AuthRefreshTokenResponseDto;
-use crate::utils::dto::MessageResponseDto;
+use crate::{MessageResponseDto, ResponseSuccessDto};
 
 use super::{
-    auth_dto::{
-        AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
-        AuthRefreshTokenRequestDto, AuthRegisterRequestDto, AuthResponseDto,
-        AuthVerifyEmailRequestDto,
-    },
-    auth_repository::{
-        mutation_forgot_password, mutation_login, mutation_new_password, mutation_refresh,
-        mutation_register, mutation_send_otp, mutation_verify_email,
-    },
+    mutation_forgot_password, mutation_login, mutation_new_password, mutation_refresh,
+    mutation_register, mutation_send_otp, mutation_verify_email, AuthDataDto, AuthForgotRequestDto,
+    AuthLoginRequestDto, AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
+    AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
 };
+
 use axum::{extract::Json, response::IntoResponse};
 
 #[utoipa::path(
@@ -19,7 +14,7 @@ use axum::{extract::Json, response::IntoResponse};
     path = "/v1/auth/login",
     request_body = AuthLoginRequestDto,
     responses(
-        (status = 200, description = "Login successful", body = AuthResponseDto),
+        (status = 200, description = "Login successful", body = ResponseSuccessDto<AuthDataDto>),
         (status = 401, description = "Unauthorized", body = MessageResponseDto)
     ),
     tag = "Authentication"
@@ -113,7 +108,7 @@ pub async fn post_verify_email(
     path = "/v1/auth/refresh",
     request_body = AuthRefreshTokenRequestDto,
     responses(
-        (status = 200, description = "Refresh successful", body = AuthRefreshTokenResponseDto),
+        (status = 200, description = "Refresh successful", body = ResponseSuccessDto<AuthTokenItemDto>),
         (status = 401, description = "Unauthorized", body = MessageResponseDto)
     ),
     tag = "Authentication"

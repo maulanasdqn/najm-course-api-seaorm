@@ -1,32 +1,22 @@
-use super::roles_dto::{
-    RolesDetailResponseDto, RolesItemDto, RolesListResponseDto, RolesRequestDto,
-};
 use crate::{
-    apps::v1::permissions::permissions_dto::PermissionsItemDto,
-    get_version,
-    libs::database::{
-        get_db,
-        schemas::{
-            app_permissions_schema::Entity as Permission,
-            app_roles_permissions_schema::{
-                ActiveModel as RolePermissionActiveModel, Column as RolePermissionColumn,
-                Entity as RolePermission,
-            },
-            app_roles_schema::{
-                ActiveModel as RoleActiveModel, Column as RoleColumn, Entity as Role,
-                Model as RoleModel,
-            },
-        },
+    get_db, get_version,
+    permissions::PermissionsItemDto,
+    schemas::{
+        PermissionsEntity, RolesActiveModel, RolesColumn, RolesEntity, RolesModel,
+        RolesPermissionsActiveModel, RolesPermissionsColumn, RolesPermissionsEntity,
     },
-    utils::{
-        dto::{MetaRequestDto, MetaResponseDto},
-        error::AppError,
-    },
+    AppError, MetaRequestDto, MetaResponseDto,
 };
+
+use super::{
+    roles_dto::{RolesDetailResponseDto, RolesItemDto, RolesListResponseDto, RolesRequestDto},
+    RolesIdOnlyDto,
+};
+
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    Set,
+    QuerySelect, Set,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -38,11 +28,11 @@ pub async fn query_get_roles(params: MetaRequestDto) -> Json<RolesListResponseDt
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(10).max(1).min(100);
 
-    let paginator = Role::find().paginate(&db, per_page);
+    let paginator = RolesEntity::find().paginate(&db, per_page);
 
     let total_items = paginator.num_items().await.unwrap_or(0);
 
-    let roles: Vec<RoleModel> = paginator.fetch_page(page - 1).await.unwrap_or_default();
+    let roles: Vec<RolesModel> = paginator.fetch_page(page - 1).await.unwrap_or_default();
 
     let data: Vec<RolesItemDto> = roles
         .into_iter()
@@ -70,15 +60,16 @@ pub async fn query_get_role_by_id(id: Uuid) -> Result<Json<RolesDetailResponseDt
     let db: DatabaseConnection = get_db().await;
     let version = get_version().unwrap();
 
-    let role = Role::find()
-        .filter(RoleColumn::Id.eq(id))
+    let role = RolesEntity::find()
+        .filter(RolesColumn::Id.eq(id))
         .one(&db)
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let permissions = RolePermission::find()
-        .filter(RolePermissionColumn::RoleId.eq(id))
-        .find_also_related(Permission)
+    let permissions = RolesPermissionsEntity::find()
+        .select_only()
+        .filter(RolesPermissionsColumn::RoleId.eq(id))
+        .find_also_related(PermissionsEntity)
         .all(&db)
         .await?
         .into_iter()
@@ -119,8 +110,8 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
         }
     };
 
-    if let Ok(Some(_)) = Role::find()
-        .filter(RoleColumn::Name.eq(payload.name.clone()))
+    if let Ok(Some(_)) = RolesEntity::find()
+        .filter(RolesColumn::Name.eq(payload.name.clone()))
         .one(&db)
         .await
     {
@@ -134,7 +125,7 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
             .into_response();
     }
 
-    let new_role = RoleActiveModel {
+    let new_role = RolesActiveModel {
         id: Set(Uuid::new_v4()),
         name: Set(payload.name.clone()),
         created_at: Set(Some(chrono::Utc::now())),
@@ -158,7 +149,7 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
 
     if let Some(permission_ids) = &payload.permissions {
         for permission_id in permission_ids {
-            let role_permission = RolePermissionActiveModel {
+            let role_permission = RolesPermissionsActiveModel {
                 id: Set(Uuid::new_v4()),
                 role_id: Set(role.id),
                 permission_id: Set(
@@ -188,4 +179,17 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
         })),
     )
         .into_response()
+}
+
+pub async fn query_get_role_student_id() -> Result<RolesIdOnlyDto, AppError> {
+    let db: DatabaseConnection = get_db().await;
+    RolesEntity::find()
+        .select_only()
+        .column(RolesColumn::Id)
+        .filter(RolesColumn::Name.eq("Student"))
+        .one(&db)
+        .await
+        .map_err(|err| AppError::DatabaseError(err))?
+        .map(|r| RolesIdOnlyDto { id: r.id })
+        .ok_or(AppError::NotFound)
 }
