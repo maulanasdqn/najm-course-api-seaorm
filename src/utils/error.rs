@@ -29,7 +29,7 @@ impl IntoResponse for AppError {
                 Json(json!({ "message": "Resource not found" })),
             ),
             AppError::DatabaseError(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::NOT_FOUND,
                 Json(json!({ "message": "Database error", "error": err.to_string() })),
             ),
             AppError::InternalError => (

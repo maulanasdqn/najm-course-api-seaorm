@@ -6,10 +6,10 @@ use super::auth_dto::{
 use crate::{
     common_response, connect_redis, decode_access_token, decode_refresh_token, encode_access_token,
     encode_refresh_token, get_db, hash_password,
-    roles::query_get_role_student_id,
+    roles::{query_get_role_by_id, query_get_role_student_id},
     schemas::{UsersActiveModel, UsersColumn, UsersEntity},
     send_email, success_response,
-    users::{query_get_user_by_email, query_password_and_is_active},
+    users::UsersItemDto,
     verify_password, OtpManager, ResponseSuccessDto,
 };
 use axum::{http::StatusCode, response::Response, Json};
@@ -26,30 +26,79 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         return common_response(StatusCode::BAD_REQUEST, "Email and password are required");
     }
 
-    let user_response = query_get_user_by_email(credentials.email.clone())
+    let db = get_db().await;
+
+    let user_data = match UsersEntity::find()
+        .select_only()
+        .column(UsersColumn::Id)
+        .column(UsersColumn::Email)
+        .column(UsersColumn::Password)
+        .column(UsersColumn::IsActive)
+        .column(UsersColumn::Fullname)
+        .column(UsersColumn::Avatar)
+        .column(UsersColumn::PhoneNumber)
+        .column(UsersColumn::ReferralCode)
+        .column(UsersColumn::ReferredBy)
+        .column(UsersColumn::RoleId)
+        .filter(UsersColumn::Email.eq(credentials.email.clone()))
+        .into_tuple::<(
+            Uuid,
+            String,
+            String,
+            bool,
+            String,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
+            Uuid,
+        )>()
+        .one(&db)
         .await
-        .unwrap();
+    {
+        Ok(Some((
+            id,
+            email,
+            hashed_password,
+            is_active,
+            fullname,
+            avatar,
+            phone_number,
+            referral_code,
+            referred_by,
+            role_id,
+        ))) => (
+            id,
+            email,
+            hashed_password,
+            is_active,
+            fullname,
+            avatar,
+            phone_number,
+            referral_code,
+            referred_by,
+            role_id,
+        ),
+        Ok(None) => return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid"),
+        Err(_) => {
+            return common_response(StatusCode::INTERNAL_SERVER_ERROR, "Database query failed")
+        }
+    };
 
-    if user_response.data.id.eq(&"".to_string()) || user_response.data.id.is_empty() {
-        return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid");
-    }
+    let (
+        id,
+        email,
+        hashed_password,
+        is_active,
+        fullname,
+        avatar,
+        phone_number,
+        referral_code,
+        referred_by,
+        role_id,
+    ) = user_data;
 
-    if user_response.data.email.is_empty() {
-        return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid");
-    }
-
-    let user_verify = query_password_and_is_active(user_response.data.email.clone())
-        .await
-        .unwrap();
-
-    let hashed_password = &user_verify.password;
-
-    let is_active = &user_verify.is_active;
-
-    let is_password_valid =
-        verify_password(&credentials.password, &hashed_password).unwrap_or(false);
-
-    if !is_password_valid {
+    if !verify_password(&credentials.password, &hashed_password).unwrap_or(false) {
         return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid");
     }
 
@@ -60,8 +109,8 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         );
     }
 
-    let access_token = encode_access_token(credentials.email.clone()).unwrap();
-    let refresh_token = encode_refresh_token(credentials.email.clone()).unwrap();
+    let access_token = encode_access_token(email.clone()).unwrap();
+    let refresh_token = encode_refresh_token(email.clone()).unwrap();
 
     let response = ResponseSuccessDto {
         data: AuthDataDto {
@@ -69,7 +118,18 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
                 access_token,
                 refresh_token,
             },
-            user: user_response.data.clone(),
+            user: UsersItemDto {
+                id: id.to_string(),
+                email,
+                fullname,
+                avatar,
+                phone_number,
+                referral_code,
+                referred_by,
+                role: Some(query_get_role_by_id(role_id).await.unwrap().data.clone()),
+                created_at: None,
+                updated_at: None,
+            },
         },
     };
 
@@ -322,10 +382,10 @@ pub async fn mutation_refresh(Json(payload): Json<AuthRefreshTokenRequestDto>) -
     };
 
     let auth_response = ResponseSuccessDto {
-        data: AuthTokenItemDto {
+        data: Some(AuthTokenItemDto {
             access_token: new_access_token,
             refresh_token: new_refresh_token,
-        },
+        }),
     };
 
     success_response(auth_response)

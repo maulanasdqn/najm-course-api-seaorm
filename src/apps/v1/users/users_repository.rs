@@ -17,7 +17,10 @@ use super::users_dto::{
 use super::UsersCheckLoginDto;
 use crate::roles::query_get_role_by_id;
 use crate::schemas::{RolesEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation};
-use crate::{get_db, get_version, hash_password, AppError, MetaRequestDto, MetaResponseDto};
+use crate::{
+    get_db, get_version, hash_password, AppError, MetaRequestDto, MetaResponseDto,
+    ResponseSuccessDto,
+};
 
 pub async fn mutation_create_users(
     new_user: Json<UsersCreateRequestDto>,
@@ -149,24 +152,10 @@ pub async fn query_get_user_by_id(
     }
 }
 
-pub async fn query_get_user_by_email(
-    email_payload: String,
-) -> Result<Json<UsersDetailResponseDto>, AppError> {
+pub async fn query_get_user_by_email(email_payload: String) -> ResponseSuccessDto<UsersItemDto> {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
-    if let Some((
-        id,
-        email,
-        fullname,
-        avatar,
-        phone_number,
-        referral_code,
-        referred_by,
-        role_id,
-        created_at,
-        updated_at,
-    )) = UsersEntity::find()
+    match UsersEntity::find()
         .select_only()
         .column(UsersColumn::Id)
         .column(UsersColumn::Email)
@@ -180,29 +169,21 @@ pub async fn query_get_user_by_email(
         .column(UsersColumn::UpdatedAt)
         .filter(UsersColumn::Email.eq(email_payload))
         .into_tuple::<(
-            String,
+            Uuid,
             String,
             String,
             Option<String>,
             String,
             Option<String>,
             Option<String>,
-            String,
+            Uuid,
             Option<DateTime<Utc>>,
             Option<DateTime<Utc>>,
         )>()
         .one(&db)
-        .await?
+        .await
     {
-        let role = Some(
-            query_get_role_by_id(Uuid::parse_str(&role_id).unwrap())
-                .await
-                .unwrap()
-                .data
-                .clone(),
-        );
-
-        let user_detail = UsersItemDto {
+        Ok(Some((
             id,
             email,
             fullname,
@@ -210,37 +191,62 @@ pub async fn query_get_user_by_email(
             phone_number,
             referral_code,
             referred_by,
-            role,
-            created_at: created_at.map(|dt| dt.to_string()),
-            updated_at: updated_at.map(|dt| dt.to_string()),
-        };
+            role_id,
+            created_at,
+            updated_at,
+        ))) => match query_get_role_by_id(role_id).await {
+            Ok(role_response) => {
+                let role = Some(role_response.data.clone());
 
-        Ok(Json(UsersDetailResponseDto {
-            data: user_detail,
-            version,
-        }))
-    } else {
-        Err(AppError::NotFound)
+                let user_detail = UsersItemDto {
+                    id: id.to_string(),
+                    email,
+                    fullname,
+                    avatar,
+                    phone_number,
+                    referral_code,
+                    referred_by,
+                    role,
+                    created_at: created_at.map(|dt| dt.to_string()),
+                    updated_at: updated_at.map(|dt| dt.to_string()),
+                };
+
+                ResponseSuccessDto { data: user_detail }
+            }
+            Err(_) => ResponseSuccessDto {
+                data: UsersItemDto::default(),
+            },
+        },
+        Ok(None) => ResponseSuccessDto {
+            data: UsersItemDto::default(),
+        },
+        Err(_) => ResponseSuccessDto {
+            data: UsersItemDto::default(),
+        },
     }
 }
 
-pub async fn query_password_and_is_active(email: String) -> Result<UsersCheckLoginDto, AppError> {
+pub async fn query_password_and_is_active(email: String) -> ResponseSuccessDto<UsersCheckLoginDto> {
     let db: DatabaseConnection = get_db().await;
 
-    if let Some(user) = UsersEntity::find()
+    match UsersEntity::find()
         .select_only()
         .column(UsersColumn::Password)
         .column(UsersColumn::IsActive)
         .filter(UsersColumn::Email.eq(email))
+        .into_tuple::<(String, bool)>()
         .one(&db)
-        .await?
+        .await
     {
-        Ok(UsersCheckLoginDto {
-            password: user.password,
-            is_active: user.is_active,
-        })
-    } else {
-        Err(AppError::NotFound)
+        Ok(Some((password, is_active))) => ResponseSuccessDto {
+            data: UsersCheckLoginDto {
+                password,
+                is_active,
+            },
+        },
+        Ok(None) | Err(_) => ResponseSuccessDto {
+            data: UsersCheckLoginDto::default(),
+        },
     }
 }
 

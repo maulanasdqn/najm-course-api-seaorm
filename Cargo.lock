@@ -1532,6 +1532,7 @@ dependencies = [
  "argon2",
  "axum",
  "chrono",
+ "hyper",
  "jsonwebtoken",
  "lettre",
  "log",

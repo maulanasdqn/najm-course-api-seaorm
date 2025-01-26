@@ -60,9 +60,7 @@ pub async fn authorization_middleware(
         }
     };
 
-    let user_response = query_get_user_by_email(token_data.claims.email)
-        .await
-        .unwrap();
+    let user_response = query_get_user_by_email(token_data.claims.email).await;
     if user_response.data.email.is_empty() {
         return Ok(format_error("Unauthorized user".to_string()));
     }

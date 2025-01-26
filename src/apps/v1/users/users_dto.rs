@@ -46,6 +46,23 @@ pub struct UsersItemDto {
     pub updated_at: Option<String>,
 }
 
+impl UsersItemDto {
+    pub(crate) fn default() -> UsersItemDto {
+        UsersItemDto {
+            id: String::new(),
+            fullname: String::new(),
+            email: String::new(),
+            avatar: None,
+            phone_number: String::new(),
+            referral_code: None,
+            referred_by: None,
+            role: None,
+            created_at: None,
+            updated_at: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UsersItemListDto {
     pub id: String,
@@ -64,6 +81,15 @@ pub struct UsersItemListDto {
 pub struct UsersCheckLoginDto {
     pub password: String,
     pub is_active: bool,
+}
+
+impl UsersCheckLoginDto {
+    pub(crate) fn default() -> UsersCheckLoginDto {
+        UsersCheckLoginDto {
+            password: String::new(),
+            is_active: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

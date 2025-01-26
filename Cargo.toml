@@ -26,6 +26,7 @@ lettre = { version = "0.11.11", features = ["tokio1-native-tls", "tokio1-rustls-
 rand = "0.8.5"
 redis = "0.28.1"
 thiserror = "2.0.11"
+hyper = "1.5.2"
 
 [profile.release]
 lto = "fat"
