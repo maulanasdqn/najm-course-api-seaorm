@@ -1,77 +1,120 @@
+use axum::{http::StatusCode, response::Response, Json};
+use sea_orm::{
+    prelude::Expr, sea_query::extension::postgres::PgExpr, ActiveModelTrait, ColumnTrait,
+    DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
+use uuid::Uuid;
+
 use crate::{
-    get_db, get_version,
+    common_response, get_db,
     permissions::PermissionsItemDto,
     schemas::{
-        PermissionsEntity, RolesActiveModel, RolesColumn, RolesEntity, RolesModel,
+        PermissionsColumn, PermissionsEntity, RolesActiveModel, RolesColumn, RolesEntity,
         RolesPermissionsActiveModel, RolesPermissionsColumn, RolesPermissionsEntity,
     },
-    AppError, MetaRequestDto, MetaResponseDto,
+    success_response, success_response_list, MetaRequestDto, MetaResponseDto, ResponseSuccessDto,
+    ResponseSuccessListDto,
 };
 
 use super::{
-    roles_dto::{RolesDetailResponseDto, RolesItemDto, RolesListResponseDto, RolesRequestDto},
-    RolesIdOnlyDto,
+    roles_dto::{RolesItemDto, RolesRequestDto},
+    RolesItemListDto,
 };
 
-use axum::{http::StatusCode, response::IntoResponse, Json};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QuerySelect, Set,
-};
-use serde_json::json;
-use uuid::Uuid;
-
-pub async fn query_get_roles(params: MetaRequestDto) -> Json<RolesListResponseDto> {
+pub async fn query_get_roles(params: MetaRequestDto) -> Response {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(10).max(1).min(100);
+    let search = params.search.unwrap_or_default().to_lowercase();
+    let sort_by = params
+        .sort_by
+        .unwrap_or("created_at".to_string())
+        .to_lowercase();
+    let order = params.order.unwrap_or("desc".to_string()).to_lowercase();
 
-    let paginator = RolesEntity::find().paginate(&db, per_page);
+    let mut query = RolesEntity::find();
 
-    let total_items = paginator.num_items().await.unwrap_or(0);
+    if !search.is_empty() {
+        query = query.filter(Expr::col(RolesColumn::Name).ilike(format!("%{}%", search)));
+    }
 
-    let roles: Vec<RolesModel> = paginator.fetch_page(page - 1).await.unwrap_or_default();
+    query = match (sort_by.as_str(), order.as_str()) {
+        ("name", "asc") => query.order_by_asc(RolesColumn::Name),
+        ("name", "desc") => query.order_by_desc(RolesColumn::Name),
+        ("created_at", "asc") => query.order_by_asc(RolesColumn::CreatedAt),
+        ("created_at", "desc") => query.order_by_desc(RolesColumn::CreatedAt),
+        ("updated_at", "asc") => query.order_by_asc(RolesColumn::UpdatedAt),
+        ("updated_at", "desc") => query.order_by_desc(RolesColumn::UpdatedAt),
+        _ => query.order_by_desc(RolesColumn::CreatedAt),
+    };
 
-    let data: Vec<RolesItemDto> = roles
+    let paginator = query.paginate(&db, per_page);
+
+    let total_items = match paginator.num_items().await {
+        Ok(count) => count,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let roles = match paginator.fetch_page(page - 1).await {
+        Ok(data) => data,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let data: Vec<RolesItemListDto> = roles
         .into_iter()
-        .map(|role| RolesItemDto {
+        .map(|role| RolesItemListDto {
             id: role.id.to_string(),
             name: role.name,
             created_at: role.created_at.map(|dt| dt.to_string()),
             updated_at: role.updated_at.map(|dt| dt.to_string()),
-            permissions: vec![],
         })
         .collect();
 
-    Json(RolesListResponseDto {
+    let response = ResponseSuccessListDto {
         data,
-        meta: MetaResponseDto {
+        meta: Some(MetaResponseDto {
             page: Some(page),
             per_page: Some(per_page),
             total: Some(total_items),
-        },
-        version,
-    })
+        }),
+    };
+
+    success_response_list(response)
 }
 
-pub async fn query_get_role_by_id(id: Uuid) -> Result<Json<RolesDetailResponseDto>, AppError> {
+pub async fn query_get_role_by_id(id: String) -> Response {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
-    let role = RolesEntity::find()
-        .filter(RolesColumn::Id.eq(id))
+    let role = match RolesEntity::find()
+        .filter(RolesColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
         .one(&db)
-        .await?
-        .ok_or(AppError::NotFound)?;
+        .await
+    {
+        Ok(Some(role)) => role,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "Role not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
 
-    let permissions = RolesPermissionsEntity::find()
-        .select_only()
-        .filter(RolesPermissionsColumn::RoleId.eq(id))
+    let permissions = match RolesPermissionsEntity::find()
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            RolesPermissionsEntity::belongs_to(PermissionsEntity)
+                .from(RolesPermissionsColumn::PermissionId)
+                .to(PermissionsColumn::Id)
+                .into(),
+        )
+        .filter(RolesPermissionsColumn::RoleId.eq(role.id))
         .find_also_related(PermissionsEntity)
         .all(&db)
-        .await?
+        .await
+    {
+        Ok(data) => data,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let permissions_dto = permissions
         .into_iter()
         .filter_map(|(_, permission)| permission)
         .map(|permission| PermissionsItemDto {
@@ -82,47 +125,28 @@ pub async fn query_get_role_by_id(id: Uuid) -> Result<Json<RolesDetailResponseDt
         })
         .collect::<Vec<PermissionsItemDto>>();
 
-    let role_detail = RolesItemDto {
+    let role_dto = RolesItemDto {
         id: role.id.to_string(),
         name: role.name,
         created_at: role.created_at.map(|dt| dt.to_string()),
         updated_at: role.updated_at.map(|dt| dt.to_string()),
-        permissions,
+        permissions: permissions_dto,
     };
 
-    Ok(Json(RolesDetailResponseDto {
-        data: role_detail,
-        version,
-    }))
+    let response = ResponseSuccessDto { data: role_dto };
+
+    success_response(response)
 }
 
-pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoResponse {
+pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
-
-    let version = match get_version() {
-        Ok(ver) => ver,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "message": "Failed to fetch application version" })),
-            )
-                .into_response();
-        }
-    };
 
     if let Ok(Some(_)) = RolesEntity::find()
         .filter(RolesColumn::Name.eq(payload.name.clone()))
         .one(&db)
         .await
     {
-        return (
-            StatusCode::CONFLICT,
-            Json(json!({
-                "message": "A role with this name already exists",
-                "version": version,
-            })),
-        )
-            .into_response();
+        return common_response(StatusCode::CONFLICT, "A role with this name already exists");
     }
 
     let new_role = RolesActiveModel {
@@ -134,17 +158,7 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
 
     let role = match new_role.insert(&db).await {
         Ok(role) => role,
-        Err(err) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "message": "Failed to create role",
-                    "version": version,
-                    "error": err.to_string(),
-                })),
-            )
-                .into_response();
-        }
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     };
 
     if let Some(permission_ids) = &payload.permissions {
@@ -158,38 +172,106 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> impl IntoRe
             };
 
             if let Err(err) = role_permission.insert(&db).await {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({
-                        "message": "Failed to associate permissions with the role",
-                        "version": version,
-                        "error": err.to_string(),
-                    })),
-                )
-                    .into_response();
+                return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
             }
         }
     }
 
-    (
-        StatusCode::CREATED,
-        Json(json!({
-            "message": "Role created successfully",
-            "version": version,
-        })),
-    )
-        .into_response()
+    common_response(StatusCode::CREATED, "Role created successfully")
 }
 
-pub async fn query_get_role_student_id() -> Result<RolesIdOnlyDto, AppError> {
+pub async fn mutation_update_role(id: String, payload: Json<RolesRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
-    RolesEntity::find()
-        .select_only()
-        .column(RolesColumn::Id)
-        .filter(RolesColumn::Name.eq("Student"))
+
+    let role_id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid role ID format"),
+    };
+
+    let role = match RolesEntity::find()
+        .filter(RolesColumn::Id.eq(role_id))
         .one(&db)
         .await
-        .map_err(|err| AppError::DatabaseError(err))?
-        .map(|r| RolesIdOnlyDto { id: r.id })
-        .ok_or(AppError::NotFound)
+    {
+        Ok(Some(role)) => role,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "Role not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let mut active_model: RolesActiveModel = role.into();
+
+    if !payload.name.is_empty() {
+        active_model.name = Set(payload.name.clone());
+    }
+    active_model.updated_at = Set(Some(chrono::Utc::now()));
+
+    let updated_role = match active_model.update(&db).await {
+        Ok(role) => role,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    if let Some(permission_ids) = &payload.permissions {
+        if let Err(err) = RolesPermissionsEntity::delete_many()
+            .filter(RolesPermissionsColumn::RoleId.eq(updated_role.id))
+            .exec(&db)
+            .await
+        {
+            return common_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                &format!("Failed to clear existing permissions: {}", err),
+            );
+        }
+
+        for permission_id in permission_ids {
+            let role_permission = RolesPermissionsActiveModel {
+                id: Set(Uuid::new_v4()),
+                role_id: Set(updated_role.id),
+                permission_id: Set(
+                    Uuid::parse_str(permission_id).unwrap_or_else(|_| Uuid::new_v4())
+                ),
+            };
+
+            if let Err(err) = role_permission.insert(&db).await {
+                return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+            }
+        }
+    }
+
+    common_response(StatusCode::OK, "Role updated successfully")
+}
+
+pub async fn mutation_delete_role(id: String) -> Response {
+    let db: DatabaseConnection = get_db().await;
+
+    let role_id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid role ID format"),
+    };
+
+    let role = match RolesEntity::find()
+        .filter(RolesColumn::Id.eq(role_id))
+        .one(&db)
+        .await
+    {
+        Ok(Some(role)) => role,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "Role not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    match role.delete(&db).await {
+        Ok(_) => {
+            if let Err(err) = RolesPermissionsEntity::delete_many()
+                .filter(RolesPermissionsColumn::RoleId.eq(role_id))
+                .exec(&db)
+                .await
+            {
+                return common_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Failed to delete associated permissions: {}", err),
+                );
+            }
+            common_response(StatusCode::OK, "Role deleted successfully")
+        }
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    }
 }

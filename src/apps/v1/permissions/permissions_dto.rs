@@ -1,4 +1,3 @@
-use crate::utils::meta::TMetaResponse;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -13,15 +12,4 @@ pub struct PermissionsItemDto {
     pub name: String,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PermissionsListResponseDto {
-    pub data: Vec<PermissionsItemDto>,
-    pub meta: TMetaResponse,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct PermissionsDetailResponseDto {
-    pub data: PermissionsItemDto,
 }

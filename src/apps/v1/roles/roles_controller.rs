@@ -3,13 +3,17 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use uuid::Uuid;
 
-use crate::utils::dto::{MessageResponseDto, MetaRequestDto};
+use crate::{
+    utils::dto::{MessageResponseDto, MetaRequestDto},
+    ResponseSuccessDto, ResponseSuccessListDto,
+};
 
 use super::{
-    roles_dto::{RolesDetailResponseDto, RolesListResponseDto, RolesRequestDto},
+    mutation_delete_role, mutation_update_role,
+    roles_dto::RolesRequestDto,
     roles_repository::{mutation_create_role, query_get_role_by_id, query_get_roles},
+    RolesItemDto, RolesItemListDto,
 };
 
 #[utoipa::path(
@@ -20,7 +24,7 @@ use super::{
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "List Roles", body = RolesListResponseDto),
+        (status = 201, description = "List Roles", body = ResponseSuccessListDto<RolesItemListDto>),
         (status = 400, description = "Invalid Roles data", body = MessageResponseDto)
     ),
     tag = "Roles"
@@ -37,13 +41,13 @@ pub async fn get_roles(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Detail Role", body = RolesDetailResponseDto),
+        (status = 201, description = "Detail Role", body = ResponseSuccessDto<RolesItemDto>),
         (status = 400, description = "Invalid Role data", body = MessageResponseDto)
     ),
     tag = "Roles"
 )]
 
-pub async fn get_detail_role(Path(id): Path<Uuid>) -> impl IntoResponse {
+pub async fn get_detail_role(Path(id): Path<String>) -> impl IntoResponse {
     query_get_role_by_id(id).await
 }
 
@@ -78,8 +82,8 @@ pub async fn post_create_role(Json(payload): Json<RolesRequestDto>) -> impl Into
     tag = "Roles"
 )]
 
-pub async fn delete_role() -> impl IntoResponse {
-    ()
+pub async fn delete_role(Path(id): Path<String>) -> impl IntoResponse {
+    mutation_delete_role(id).await
 }
 
 #[utoipa::path(
@@ -96,6 +100,9 @@ pub async fn delete_role() -> impl IntoResponse {
     tag = "Roles"
 )]
 
-pub async fn put_update_role() -> impl IntoResponse {
-    ()
+pub async fn put_update_role(
+    Path(id): Path<String>,
+    Json(payload): Json<RolesRequestDto>,
+) -> impl IntoResponse {
+    mutation_update_role(id, Json(payload)).await
 }

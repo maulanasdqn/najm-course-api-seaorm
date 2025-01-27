@@ -3,14 +3,15 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use hyper::HeaderMap;
 
-use crate::{MessageResponseDto, MetaRequestDto};
+use crate::{MessageResponseDto, MetaRequestDto, ResponseSuccessDto, ResponseSuccessListDto};
 
 use super::{
-    users_dto::{
-        UsersCreateRequestDto, UsersDetailResponseDto, UsersListResponseDto, UsersUpdateRequestDto,
-    },
+    mutation_delete_user, mutation_update_user, query_get_user_me,
+    users_dto::{UsersCreateRequestDto, UsersUpdateRequestDto},
     users_repository::{mutation_create_users, query_get_user_by_id, query_get_users},
+    UsersItemDto, UsersItemListDto,
 };
 
 #[utoipa::path(
@@ -21,7 +22,7 @@ use super::{
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "List Users", body = UsersListResponseDto),
+        (status = 201, description = "List Users", body = ResponseSuccessListDto<UsersItemListDto>),
         (status = 400, description = "Invalid Users data", body = MessageResponseDto)
     ),
     tag = "Users"
@@ -38,7 +39,7 @@ pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
         ("Bearer" = [])
     ),
     responses(
-        (status = 201, description = "Detail User", body = UsersDetailResponseDto),
+        (status = 201, description = "Detail User", body = ResponseSuccessDto<UsersItemDto>),
         (status = 400, description = "Invalid User data", body = MessageResponseDto)
     ),
     tag = "Users"
@@ -46,6 +47,23 @@ pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
 
 pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
     query_get_user_by_id(id).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/users/me",
+    security(
+        ("Bearer" = [])
+    ),
+    responses(
+        (status = 201, description = "Detail User Me", body = ResponseSuccessDto<UsersItemDto>),
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
+    ),
+    tag = "Users"
+)]
+
+pub async fn get_user_me(header: HeaderMap) -> impl IntoResponse {
+    query_get_user_me(header).await
 }
 
 #[utoipa::path(
@@ -79,8 +97,8 @@ pub async fn post_create_user(Json(payload): Json<UsersCreateRequestDto>) -> imp
     tag = "Users"
 )]
 
-pub async fn delete_user() -> impl IntoResponse {
-    ()
+pub async fn delete_user(Path(id): Path<String>) -> impl IntoResponse {
+    mutation_delete_user(id).await
 }
 
 #[utoipa::path(
@@ -97,6 +115,9 @@ pub async fn delete_user() -> impl IntoResponse {
     tag = "Users"
 )]
 
-pub async fn put_update_user() -> impl IntoResponse {
-    ()
+pub async fn put_update_user(
+    Path(id): Path<String>,
+    Json(payload): Json<UsersUpdateRequestDto>,
+) -> impl IntoResponse {
+    mutation_update_user(id, Json(payload)).await
 }

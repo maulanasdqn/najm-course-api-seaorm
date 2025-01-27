@@ -14,6 +14,8 @@ pub struct MetaRequestDto {
     pub search: Option<String>,
     pub sort_by: Option<String>,
     pub order: Option<String>,
+    pub filter: Option<String>,
+    pub filter_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, IntoParams)]

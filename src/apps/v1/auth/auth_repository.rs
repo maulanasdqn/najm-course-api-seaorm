@@ -1,22 +1,28 @@
-use super::auth_dto::{
-    AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
-    AuthRefreshTokenRequestDto, AuthRegisterRequestDto, AuthTokenItemDto,
-    AuthVerifyEmailRequestDto,
+use super::{
+    auth_dto::{
+        AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
+        AuthRefreshTokenRequestDto, AuthRegisterRequestDto, AuthTokenItemDto,
+        AuthVerifyEmailRequestDto,
+    },
+    AuthUsersItemDto,
 };
 use crate::{
     common_response, connect_redis, decode_access_token, decode_refresh_token, encode_access_token,
     encode_refresh_token, get_db, hash_password,
-    roles::{query_get_role_by_id, query_get_role_student_id},
-    schemas::{UsersActiveModel, UsersColumn, UsersEntity},
-    send_email, success_response,
-    users::UsersItemDto,
-    verify_password, OtpManager, ResponseSuccessDto,
+    permissions::PermissionsItemDto,
+    roles::RolesItemDto,
+    schemas::{
+        PermissionsColumn, PermissionsEntity, RolesColumn, RolesEntity, RolesPermissionsColumn,
+        RolesPermissionsEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation,
+    },
+    send_email, success_response, verify_password, OtpManager, ResponseSuccessDto,
 };
 use axum::{http::StatusCode, response::Response, Json};
 use chrono::Utc;
 use redis::Commands;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
+    prelude::Expr, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, JoinType,
+    QueryFilter, QuerySelect, RelationTrait, Set,
 };
 use std::env;
 use uuid::Uuid;
@@ -37,10 +43,10 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         .column(UsersColumn::Fullname)
         .column(UsersColumn::Avatar)
         .column(UsersColumn::PhoneNumber)
-        .column(UsersColumn::ReferralCode)
-        .column(UsersColumn::ReferredBy)
-        .column(UsersColumn::RoleId)
+        .column_as(Expr::col((RolesEntity, RolesColumn::Id)), "role_id")
+        .column_as(Expr::col((RolesEntity, RolesColumn::Name)), "role_name")
         .filter(UsersColumn::Email.eq(credentials.email.clone()))
+        .join(JoinType::LeftJoin, UsersRelation::Role.def())
         .into_tuple::<(
             Uuid,
             String,
@@ -49,9 +55,8 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
             String,
             Option<String>,
             String,
+            Option<Uuid>,
             Option<String>,
-            Option<String>,
-            Uuid,
         )>()
         .one(&db)
         .await
@@ -64,9 +69,8 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
             fullname,
             avatar,
             phone_number,
-            referral_code,
-            referred_by,
             role_id,
+            role_name,
         ))) => (
             id,
             email,
@@ -75,9 +79,8 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
             fullname,
             avatar,
             phone_number,
-            referral_code,
-            referred_by,
             role_id,
+            role_name,
         ),
         Ok(None) => return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid"),
         Err(_) => {
@@ -85,18 +88,8 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         }
     };
 
-    let (
-        id,
-        email,
-        hashed_password,
-        is_active,
-        fullname,
-        avatar,
-        phone_number,
-        referral_code,
-        referred_by,
-        role_id,
-    ) = user_data;
+    let (id, email, hashed_password, is_active, fullname, avatar, phone_number, role_id, role_name) =
+        user_data;
 
     if !verify_password(&credentials.password, &hashed_password).unwrap_or(false) {
         return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid");
@@ -112,23 +105,55 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
     let access_token = encode_access_token(email.clone()).unwrap();
     let refresh_token = encode_refresh_token(email.clone()).unwrap();
 
+    let permissions = if let Some(role_id) = role_id {
+        PermissionsEntity::find()
+            .join(
+                JoinType::InnerJoin,
+                RolesPermissionsEntity::belongs_to(PermissionsEntity)
+                    .from(RolesPermissionsColumn::PermissionId)
+                    .to(PermissionsColumn::Id)
+                    .into(),
+            )
+            .filter(RolesPermissionsColumn::RoleId.eq(role_id))
+            .all(&db)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|perm| PermissionsItemDto {
+                id: perm.id.to_string(),
+                name: perm.name,
+                created_at: perm.created_at.map(|dt| dt.to_string()),
+                updated_at: perm.updated_at.map(|dt| dt.to_string()),
+            })
+            .collect::<Vec<PermissionsItemDto>>()
+    } else {
+        vec![]
+    };
+
+    let role_dto = match (role_id, role_name) {
+        (Some(id), Some(name)) => Some(RolesItemDto {
+            id: id.to_string(),
+            name,
+            permissions,
+            created_at: None,
+            updated_at: None,
+        }),
+        _ => None,
+    };
+
     let response = ResponseSuccessDto {
         data: AuthDataDto {
             token: AuthTokenItemDto {
                 access_token,
                 refresh_token,
             },
-            user: UsersItemDto {
+            user: AuthUsersItemDto {
                 id: id.to_string(),
                 email,
                 fullname,
                 avatar,
                 phone_number,
-                referral_code,
-                referred_by,
-                role: Some(query_get_role_by_id(role_id).await.unwrap().data.clone()),
-                created_at: None,
-                updated_at: None,
+                role: role_dto,
             },
         },
     };
@@ -144,6 +169,8 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
     let otp_manager = OtpManager::new(300);
 
     if let Ok(Some(_)) = UsersEntity::find()
+        .select_only()
+        .column(UsersColumn::Email)
         .filter(UsersColumn::Email.eq(new_user.email.clone()))
         .one(&db)
         .await
@@ -162,11 +189,18 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
 
     let otp = otp_manager.generate_otp(redis, &new_user.email);
 
-    let student_role = query_get_role_student_id().await.unwrap();
+    let student_role = RolesEntity::find()
+        .select_only()
+        .column(RolesColumn::Id)
+        .column(RolesColumn::Name)
+        .filter(RolesColumn::Name.eq("Student"))
+        .one(&db)
+        .await
+        .unwrap();
 
     let active_model = UsersActiveModel {
         id: Set(Uuid::new_v4()),
-        role_id: Set(student_role.id),
+        role_id: Set(student_role.unwrap().id),
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
         email_verified: Set(None),
@@ -205,6 +239,8 @@ pub async fn mutation_forgot_password(Json(payload): Json<AuthForgotRequestDto>)
     }
 
     let user = UsersEntity::find()
+        .select_only()
+        .column(UsersColumn::Email)
         .filter(UsersColumn::Email.eq(payload.email.clone()))
         .one(&db)
         .await;

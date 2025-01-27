@@ -7,10 +7,15 @@ use axum::{
     },
     middleware::Next,
 };
+use sea_orm::QueryFilter;
+use sea_orm::{ColumnTrait, EntityTrait};
 use serde_json::json;
 use std::convert::Infallible;
 
-use crate::{decode_access_token, users::query_get_user_by_email};
+use crate::{
+    decode_access_token, get_db,
+    schemas::{UsersColumn, UsersEntity},
+};
 
 pub fn format_error(message: String) -> Response<Body> {
     let error_body = json!({
@@ -28,12 +33,14 @@ pub async fn authorization_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response<Body>, Infallible> {
+    let db = get_db().await;
+
     let auth_header = req.headers_mut().get(AUTHORIZATION);
 
     let auth_header = match auth_header {
         Some(header) => header.to_str(),
         None => {
-            return Ok(format_error("You not authorized".to_string()));
+            return Ok(format_error("You are not authorized".to_string()));
         }
     };
 
@@ -60,13 +67,18 @@ pub async fn authorization_middleware(
         }
     };
 
-    let user_response = query_get_user_by_email(token_data.claims.email).await;
-    if user_response.data.email.is_empty() {
-        return Ok(format_error("Unauthorized user".to_string()));
+    let user = UsersEntity::find()
+        .filter(UsersColumn::Email.eq(token_data.claims.email.clone()))
+        .one(&db)
+        .await;
+
+    match user {
+        Ok(Some(user)) => {
+            req.extensions_mut().insert(user);
+            let response = next.run(req).await;
+            Ok(response)
+        }
+        Ok(None) => Ok(format_error("Unauthorized user".to_string())),
+        Err(err) => Ok(format_error(err.to_string())),
     }
-
-    req.extensions_mut().insert(user_response);
-
-    let response = next.run(req).await;
-    Ok(response)
 }

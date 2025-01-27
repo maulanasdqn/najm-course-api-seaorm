@@ -1,4 +1,4 @@
-use crate::users::UsersItemDto;
+use crate::roles::RolesItemDto;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -65,5 +65,15 @@ pub struct AuthRefreshTokenRequestDto {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthDataDto {
     pub token: AuthTokenItemDto,
-    pub user: UsersItemDto,
+    pub user: AuthUsersItemDto,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AuthUsersItemDto {
+    pub id: String,
+    pub email: String,
+    pub fullname: String,
+    pub avatar: Option<String>,
+    pub phone_number: String,
+    pub role: Option<RolesItemDto>,
 }

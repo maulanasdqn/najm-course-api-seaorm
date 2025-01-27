@@ -2,7 +2,7 @@ pub mod v1;
 
 use crate::{
     utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto},
-    ResponseSuccessDto,
+    ResponseSuccessDto, ResponseSuccessListDto,
 };
 use axum::{
     http::{header, HeaderValue, Method},
@@ -18,7 +18,12 @@ use utoipa::{
     Modify, OpenApi,
 };
 use utoipa_swagger_ui::SwaggerUi;
-use v1::auth::{AuthDataDto, AuthTokenItemDto};
+use v1::{
+    auth::{AuthDataDto, AuthTokenItemDto},
+    permissions::PermissionsItemDto,
+    roles::{RolesItemDto, RolesItemListDto},
+    users::{UsersItemDto, UsersItemListDto},
+};
 
 pub async fn root_routes() -> Router {
     #[derive(OpenApi)]
@@ -33,6 +38,7 @@ pub async fn root_routes() -> Router {
             v1::auth::auth_controller::post_refresh,
             v1::users::users_controller::get_users,
             v1::users::users_controller::get_detail_user,
+            v1::users::users_controller::get_user_me,
             v1::users::users_controller::post_create_user,
             v1::users::users_controller::put_update_user,
             v1::users::users_controller::delete_user,
@@ -54,6 +60,12 @@ pub async fn root_routes() -> Router {
                 MessageResponseDto,
                 ResponseSuccessDto<AuthTokenItemDto>,
                 ResponseSuccessDto<AuthDataDto>,
+                ResponseSuccessDto<UsersItemDto>,
+                ResponseSuccessListDto<UsersItemListDto>,
+                ResponseSuccessListDto<RolesItemListDto>,
+                ResponseSuccessDto<RolesItemDto>,
+                ResponseSuccessListDto<PermissionsItemDto>,
+                ResponseSuccessDto<PermissionsItemDto>,
                 v1::auth::auth_dto::AuthLoginRequestDto,
                 v1::auth::auth_dto::AuthRegisterRequestDto,
                 v1::auth::auth_dto::AuthTokenItemDto,
@@ -64,17 +76,12 @@ pub async fn root_routes() -> Router {
                 v1::auth::auth_dto::AuthRefreshTokenRequestDto,
                 v1::users::users_dto::UsersCreateRequestDto,
                 v1::users::users_dto::UsersUpdateRequestDto,
-                v1::users::users_dto::UsersListResponseDto,
-                v1::users::users_dto::UsersDetailResponseDto,
                 v1::users::users_dto::UsersItemDto,
                 v1::roles::roles_dto::RolesItemDto,
+                v1::roles::roles_dto::RolesItemListDto,
                 v1::roles::roles_dto::RolesRequestDto,
-                v1::roles::roles_dto::RolesListResponseDto,
-                v1::roles::roles_dto::RolesDetailResponseDto,
                 v1::permissions::permissions_dto::PermissionsItemDto,
                 v1::permissions::permissions_dto::PermissionsRequestDto,
-                v1::permissions::permissions_dto::PermissionsListResponseDto,
-                v1::permissions::permissions_dto::PermissionsDetailResponseDto
             )
         ),
         info(

@@ -1,53 +1,56 @@
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
+use axum::response::Response;
 use axum::Json;
-use chrono::{DateTime, Utc};
+use chrono::{NaiveDate, Utc};
+use hyper::HeaderMap;
+use prelude::Expr;
+use sea_orm::sea_query::extension::postgres::PgExpr;
 use sea_orm::{
     entity::*, ActiveModelTrait, DatabaseConnection, JoinType, PaginatorTrait, QueryFilter,
-    QuerySelect, Set,
+    QueryOrder, QuerySelect, Set,
 };
-use serde_json::json;
 use uuid::Uuid;
-use validator::Validate;
 
-use super::users_dto::{
-    UsersCreateRequestDto, UsersDetailResponseDto, UsersItemDto, UsersItemListDto,
-    UsersListResponseDto,
+use super::users_dto::{UsersCreateRequestDto, UsersItemDto, UsersItemListDto};
+use super::UsersUpdateRequestDto;
+use crate::permissions::PermissionsItemDto;
+use crate::roles::RolesItemDto;
+use crate::schemas::{
+    PermissionsColumn, PermissionsEntity, RolesEntity, RolesPermissionsColumn,
+    RolesPermissionsEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation,
 };
-use super::UsersCheckLoginDto;
-use crate::roles::query_get_role_by_id;
-use crate::schemas::{RolesEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation};
 use crate::{
-    get_db, get_version, hash_password, AppError, MetaRequestDto, MetaResponseDto,
-    ResponseSuccessDto,
+    common_response, decode_access_token, get_db, hash_password, success_response,
+    success_response_list, MetaRequestDto, MetaResponseDto, ResponseSuccessDto,
+    ResponseSuccessListDto,
 };
 
-pub async fn mutation_create_users(
-    new_user: Json<UsersCreateRequestDto>,
-) -> Result<Response, AppError> {
+pub async fn mutation_create_users(new_user: Json<UsersCreateRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
-    new_user
-        .validate()
-        .map_err(|_| AppError::ValidationFailed)?;
-
-    if let Some(_) = UsersEntity::find()
-        .filter(UsersColumn::Email.eq(new_user.email.clone()))
-        .one(&db)
-        .await?
-    {
-        return Err(AppError::ValidationFailed);
+    if new_user.password.len() < 8 {
+        return common_response(
+            StatusCode::BAD_REQUEST,
+            "Password must be have 8 character long",
+        );
     }
 
-    let hashed_password = hash_password(&new_user.password).map_err(|_| AppError::InternalError)?;
+    if let Ok(Some(_)) = UsersEntity::find()
+        .filter(UsersColumn::Email.eq(new_user.email.clone()))
+        .one(&db)
+        .await
+    {
+        return common_response(StatusCode::CONFLICT, "User with that email already exist");
+    }
+
+    let hashed_password = hash_password(&new_user.password).unwrap();
 
     let active_model = UsersActiveModel {
         id: Set(Uuid::new_v4()),
-        role_id: Set(Uuid::parse_str(new_user.role_id.as_str()).unwrap_or(Uuid::new_v4())),
+        role_id: Set(Uuid::parse_str(&new_user.role_id).unwrap()),
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
-        email_verified: Set(Some(Utc::now())),
+        email_verified: Set(None),
         avatar: Set(None),
         phone_number: Set(new_user.phone_number.clone()),
         password: Set(hashed_password),
@@ -65,207 +68,271 @@ pub async fn mutation_create_users(
         updated_at: Set(Some(Utc::now())),
     };
 
-    active_model
-        .insert(&db)
-        .await
-        .map_err(AppError::DatabaseError)?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(json!({ "message": "User created successfully", "version": version })),
-    )
-        .into_response())
-}
-
-pub async fn query_get_user_by_id(
-    id_payload: String,
-) -> Result<Json<UsersDetailResponseDto>, AppError> {
-    let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
-
-    if let Some((
-        id,
-        email,
-        fullname,
-        avatar,
-        phone_number,
-        referral_code,
-        referred_by,
-        role_id,
-        created_at,
-        updated_at,
-    )) = UsersEntity::find()
-        .select_only()
-        .column(UsersColumn::Id)
-        .column(UsersColumn::Email)
-        .column(UsersColumn::Fullname)
-        .column(UsersColumn::Avatar)
-        .column(UsersColumn::PhoneNumber)
-        .column(UsersColumn::ReferralCode)
-        .column(UsersColumn::ReferredBy)
-        .column(UsersColumn::RoleId)
-        .column(UsersColumn::CreatedAt)
-        .column(UsersColumn::UpdatedAt)
-        .filter(UsersColumn::Id.eq(id_payload))
-        .into_tuple::<(
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            Option<String>,
-            Option<String>,
-            String,
-            Option<DateTime<Utc>>,
-            Option<DateTime<Utc>>,
-        )>()
-        .one(&db)
-        .await?
-    {
-        let role = Some(
-            query_get_role_by_id(Uuid::parse_str(&role_id).unwrap())
-                .await
-                .unwrap()
-                .data
-                .clone(),
-        );
-
-        let user_detail = UsersItemDto {
-            id,
-            email,
-            fullname,
-            avatar,
-            phone_number,
-            referral_code,
-            referred_by,
-            role,
-            created_at: created_at.map(|dt| dt.to_string()),
-            updated_at: updated_at.map(|dt| dt.to_string()),
-        };
-
-        Ok(Json(UsersDetailResponseDto {
-            data: user_detail,
-            version,
-        }))
-    } else {
-        Err(AppError::NotFound)
+    match active_model.insert(&db).await {
+        Ok(_) => common_response(StatusCode::CREATED, "User created successfully"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     }
 }
 
-pub async fn query_get_user_by_email(email_payload: String) -> ResponseSuccessDto<UsersItemDto> {
-    let db: DatabaseConnection = get_db().await;
+pub async fn query_get_user_me(headers: HeaderMap) -> Response {
+    let db = get_db().await;
+
+    let auth_header = match headers.get("Authorization") {
+        Some(header) => header.to_str(),
+        None => return common_response(StatusCode::FORBIDDEN, "You are not authorized"),
+    };
+
+    let auth_header = match auth_header {
+        Ok(header) => header,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid header format"),
+    };
+
+    let mut header_parts = auth_header.split_whitespace();
+
+    let token = match header_parts.nth(1) {
+        Some(token) => token,
+        None => return common_response(StatusCode::BAD_REQUEST, "Invalid token format"),
+    };
+
+    let token_data = match decode_access_token(token.to_string()) {
+        Ok(data) => data,
+        Err(_) => return common_response(StatusCode::UNAUTHORIZED, "Invalid or expired token"),
+    };
+
+    let email = token_data.claims.email;
 
     match UsersEntity::find()
-        .select_only()
-        .column(UsersColumn::Id)
-        .column(UsersColumn::Email)
-        .column(UsersColumn::Fullname)
-        .column(UsersColumn::Avatar)
-        .column(UsersColumn::PhoneNumber)
-        .column(UsersColumn::ReferralCode)
-        .column(UsersColumn::ReferredBy)
-        .column(UsersColumn::RoleId)
-        .column(UsersColumn::CreatedAt)
-        .column(UsersColumn::UpdatedAt)
-        .filter(UsersColumn::Email.eq(email_payload))
-        .into_tuple::<(
-            Uuid,
-            String,
-            String,
-            Option<String>,
-            String,
-            Option<String>,
-            Option<String>,
-            Uuid,
-            Option<DateTime<Utc>>,
-            Option<DateTime<Utc>>,
-        )>()
-        .one(&db)
-        .await
-    {
-        Ok(Some((
-            id,
-            email,
-            fullname,
-            avatar,
-            phone_number,
-            referral_code,
-            referred_by,
-            role_id,
-            created_at,
-            updated_at,
-        ))) => match query_get_role_by_id(role_id).await {
-            Ok(role_response) => {
-                let role = Some(role_response.data.clone());
-
-                let user_detail = UsersItemDto {
-                    id: id.to_string(),
-                    email,
-                    fullname,
-                    avatar,
-                    phone_number,
-                    referral_code,
-                    referred_by,
-                    role,
-                    created_at: created_at.map(|dt| dt.to_string()),
-                    updated_at: updated_at.map(|dt| dt.to_string()),
-                };
-
-                ResponseSuccessDto { data: user_detail }
-            }
-            Err(_) => ResponseSuccessDto {
-                data: UsersItemDto::default(),
-            },
-        },
-        Ok(None) => ResponseSuccessDto {
-            data: UsersItemDto::default(),
-        },
-        Err(_) => ResponseSuccessDto {
-            data: UsersItemDto::default(),
-        },
-    }
-}
-
-pub async fn query_password_and_is_active(email: String) -> ResponseSuccessDto<UsersCheckLoginDto> {
-    let db: DatabaseConnection = get_db().await;
-
-    match UsersEntity::find()
-        .select_only()
-        .column(UsersColumn::Password)
-        .column(UsersColumn::IsActive)
         .filter(UsersColumn::Email.eq(email))
-        .into_tuple::<(String, bool)>()
+        .find_also_related(RolesEntity)
         .one(&db)
         .await
     {
-        Ok(Some((password, is_active))) => ResponseSuccessDto {
-            data: UsersCheckLoginDto {
-                password,
-                is_active,
-            },
-        },
-        Ok(None) | Err(_) => ResponseSuccessDto {
-            data: UsersCheckLoginDto::default(),
-        },
+        Ok(Some((user, Some(role)))) => {
+            let permissions = PermissionsEntity::find()
+                .join(
+                    JoinType::InnerJoin,
+                    RolesPermissionsEntity::belongs_to(PermissionsEntity)
+                        .from(RolesPermissionsColumn::PermissionId)
+                        .to(PermissionsColumn::Id)
+                        .into(),
+                )
+                .filter(RolesPermissionsColumn::RoleId.eq(role.id))
+                .all(&db)
+                .await
+                .unwrap_or_default();
+
+            let role_permissions = permissions
+                .into_iter()
+                .map(|perm| PermissionsItemDto {
+                    id: perm.id.to_string(),
+                    name: perm.name,
+                    created_at: perm.created_at.map(|dt| dt.to_string()),
+                    updated_at: perm.updated_at.map(|dt| dt.to_string()),
+                })
+                .collect::<Vec<PermissionsItemDto>>();
+
+            let role_dto = RolesItemDto {
+                id: role.id.to_string(),
+                name: role.name,
+                permissions: role_permissions,
+                created_at: role.created_at.map(|dt| dt.to_string()),
+                updated_at: role.updated_at.map(|dt| dt.to_string()),
+            };
+
+            let user_detail = UsersItemDto {
+                id: user.id.to_string(),
+                email: user.email,
+                fullname: user.fullname,
+                avatar: user.avatar,
+                phone_number: user.phone_number,
+                referral_code: user.referral_code,
+                referred_by: user.referred_by,
+                role: Some(role_dto),
+                identity_number: user.identity_number,
+                is_active: user.is_active,
+                student_type: user.student_type,
+                religion: user.religion,
+                gender: user.gender,
+                created_at: user.created_at.map(|dt| dt.to_string()),
+                updated_at: user.updated_at.map(|dt| dt.to_string()),
+            };
+
+            let response = ResponseSuccessDto { data: user_detail };
+            success_response(response)
+        }
+        Ok(Some((user, None))) => {
+            let user_detail = UsersItemDto {
+                id: user.id.to_string(),
+                email: user.email,
+                fullname: user.fullname,
+                avatar: user.avatar,
+                phone_number: user.phone_number,
+                referral_code: user.referral_code,
+                referred_by: user.referred_by,
+                role: None,
+                identity_number: user.identity_number,
+                is_active: user.is_active,
+                student_type: user.student_type,
+                religion: user.religion,
+                gender: user.gender,
+                created_at: user.created_at.map(|dt| dt.to_string()),
+                updated_at: user.updated_at.map(|dt| dt.to_string()),
+            };
+            let response = ResponseSuccessDto { data: user_detail };
+            success_response(response)
+        }
+        Ok(None) => common_response(StatusCode::NOT_FOUND, "User not found"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     }
 }
 
-pub async fn query_get_users(params: MetaRequestDto) -> Json<UsersListResponseDto> {
+pub async fn query_get_user_by_id(id_payload: String) -> Response {
+    let db = get_db().await;
+
+    match UsersEntity::find()
+        .filter(UsersColumn::Id.eq(Uuid::parse_str(&id_payload).unwrap()))
+        .find_also_related(RolesEntity)
+        .one(&db)
+        .await
+    {
+        Ok(Some((user, Some(role)))) => {
+            let permissions = PermissionsEntity::find()
+                .join(
+                    sea_orm::JoinType::InnerJoin,
+                    RolesPermissionsEntity::belongs_to(PermissionsEntity)
+                        .from(RolesPermissionsColumn::PermissionId)
+                        .to(PermissionsColumn::Id)
+                        .into(),
+                )
+                .filter(RolesPermissionsColumn::RoleId.eq(role.id))
+                .all(&db)
+                .await
+                .unwrap_or_default();
+
+            let role_permissions = permissions
+                .into_iter()
+                .map(|perm| PermissionsItemDto {
+                    id: perm.id.to_string(),
+                    name: perm.name,
+                    created_at: perm.created_at.map(|dt| dt.to_string()),
+                    updated_at: perm.updated_at.map(|dt| dt.to_string()),
+                })
+                .collect::<Vec<PermissionsItemDto>>();
+
+            let role_dto = RolesItemDto {
+                id: role.id.to_string(),
+                name: role.name,
+                permissions: role_permissions,
+                created_at: role.created_at.map(|dt| dt.to_string()),
+                updated_at: role.updated_at.map(|dt| dt.to_string()),
+            };
+
+            let user_detail = UsersItemDto {
+                id: user.id.to_string(),
+                email: user.email,
+                fullname: user.fullname,
+                avatar: user.avatar,
+                phone_number: user.phone_number,
+                referral_code: user.referral_code,
+                referred_by: user.referred_by,
+                role: Some(role_dto),
+                identity_number: user.identity_number,
+                is_active: user.is_active,
+                student_type: user.student_type,
+                religion: user.religion,
+                gender: user.gender,
+                created_at: user.created_at.map(|dt| dt.to_string()),
+                updated_at: user.updated_at.map(|dt| dt.to_string()),
+            };
+
+            let response = ResponseSuccessDto { data: user_detail };
+            success_response(response)
+        }
+        Ok(Some((user, None))) => {
+            let user_detail = UsersItemDto {
+                id: user.id.to_string(),
+                email: user.email,
+                fullname: user.fullname,
+                avatar: user.avatar,
+                phone_number: user.phone_number,
+                referral_code: user.referral_code,
+                referred_by: user.referred_by,
+                role: None,
+                identity_number: user.identity_number,
+                is_active: user.is_active,
+                student_type: user.student_type,
+                religion: user.religion,
+                gender: user.gender,
+                created_at: user.created_at.map(|dt| dt.to_string()),
+                updated_at: user.updated_at.map(|dt| dt.to_string()),
+            };
+            let response = ResponseSuccessDto { data: user_detail };
+            success_response(response)
+        }
+        Ok(None) => common_response(StatusCode::NOT_FOUND, "User not found"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    }
+}
+
+pub async fn query_get_users(params: MetaRequestDto) -> Response {
     let db: DatabaseConnection = get_db().await;
-    let version = get_version().unwrap();
 
-    let page = params.page.unwrap_or(1).max(1);
-    let per_page = params.per_page.unwrap_or(10).max(1).min(100);
+    let page = params.page.unwrap_or(1);
+    let per_page = params.per_page.unwrap_or(10);
+    let search = params.search.unwrap_or_default();
+    let sort_by = params
+        .sort_by
+        .unwrap_or("created_at".to_string())
+        .to_lowercase();
+    let order = params.order.unwrap_or("desc".to_string()).to_lowercase();
+    let filter = params.filter.unwrap_or_default();
+    let filter_by = params.filter_by.unwrap_or_default().to_lowercase();
 
-    let paginator = UsersEntity::find()
-        .filter(UsersColumn::IsDeleted.eq(false))
+    let mut query = UsersEntity::find().filter(UsersColumn::IsDeleted.eq(false));
+
+    if !search.is_empty() {
+        query = query.filter(Expr::col(UsersColumn::Fullname).ilike(format!("%{}%", search)));
+    }
+
+    if filter_by == "role_id" && !filter.is_empty() {
+        if let Ok(role_id) = Uuid::parse_str(&filter) {
+            query = query.filter(UsersColumn::RoleId.eq(role_id));
+        } else {
+            return common_response(StatusCode::BAD_REQUEST, "Invalid role_id format");
+        }
+    }
+
+    query = match (sort_by.as_str(), order.as_str()) {
+        ("fullname", "asc") => query.order_by_asc(UsersColumn::Fullname),
+        ("fullname", "desc") => query.order_by_desc(UsersColumn::Fullname),
+        ("email", "asc") => query.order_by_asc(UsersColumn::Email),
+        ("email", "desc") => query.order_by_desc(UsersColumn::Email),
+        ("created_at", "asc") => query.order_by_asc(UsersColumn::CreatedAt),
+        ("created_at", "desc") => query.order_by_desc(UsersColumn::CreatedAt),
+        ("updated_at", "asc") => query.order_by_asc(UsersColumn::UpdatedAt),
+        ("updated_at", "desc") => query.order_by_desc(UsersColumn::UpdatedAt),
+        _ => query.order_by_asc(UsersColumn::CreatedAt),
+    };
+
+    let paginator = query
         .join(JoinType::LeftJoin, UsersRelation::Role.def())
         .select_also(RolesEntity)
         .paginate(&db, per_page);
 
-    let total_items = paginator.num_items().await.unwrap_or(0);
+    let total_items = match paginator.num_items().await {
+        Ok(count) => count,
+        Err(err) => {
+            return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+        }
+    };
 
-    let results = paginator.fetch_page(page - 1).await.unwrap_or(vec![]);
+    let results = match paginator.fetch_page(page - 1).await {
+        Ok(data) => data,
+        Err(err) => {
+            return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+        }
+    };
+
     let data: Vec<UsersItemListDto> = results
         .into_iter()
         .map(|(user, role)| UsersItemListDto {
@@ -276,19 +343,140 @@ pub async fn query_get_users(params: MetaRequestDto) -> Json<UsersListResponseDt
             phone_number: user.phone_number,
             referral_code: user.referral_code,
             referred_by: user.referred_by,
-            role: role.map(|r| r.name).unwrap_or("-".to_string()),
+            role: role.map(|r| r.name).unwrap_or_else(|| "-".to_string()),
             created_at: user.created_at.map(|dt| dt.to_string()),
             updated_at: user.updated_at.map(|dt| dt.to_string()),
         })
         .collect();
 
-    Json(UsersListResponseDto {
+    let users_response = ResponseSuccessListDto {
         data,
         meta: Some(MetaResponseDto {
             page: Some(page),
             per_page: Some(per_page),
             total: Some(total_items),
         }),
-        version,
-    })
+    };
+
+    success_response_list(users_response)
+}
+
+pub async fn mutation_delete_user(user_id: String) -> Response {
+    let db: DatabaseConnection = get_db().await;
+
+    let user_id = match Uuid::parse_str(&user_id) {
+        Ok(id) => id,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+    };
+
+    let user = match UsersEntity::find()
+        .filter(UsersColumn::Id.eq(user_id))
+        .filter(UsersColumn::IsDeleted.eq(false))
+        .one(&db)
+        .await
+    {
+        Ok(Some(user)) => user,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "User not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let mut active_model: UsersActiveModel = user.into();
+    active_model.is_deleted = Set(true);
+    active_model.updated_at = Set(Some(Utc::now()));
+
+    match active_model.update(&db).await {
+        Ok(_) => common_response(StatusCode::OK, "User deleted successfully"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    }
+}
+
+pub async fn mutation_update_user(
+    id: String,
+    Json(update_data): Json<UsersUpdateRequestDto>,
+) -> Response {
+    let db = get_db().await;
+
+    let user_id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+    };
+
+    let user = match UsersEntity::find()
+        .filter(UsersColumn::Id.eq(user_id))
+        .filter(UsersColumn::IsDeleted.eq(false))
+        .one(&db)
+        .await
+    {
+        Ok(Some(user)) => user,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "User not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let mut active_model: UsersActiveModel = user.into();
+
+    if let Some(email) = &update_data.email {
+        active_model.email = Set(email.clone());
+    }
+
+    if let Some(fullname) = &update_data.fullname {
+        active_model.fullname = Set(fullname.clone());
+    }
+
+    if let Some(avatar) = &update_data.avatar {
+        active_model.avatar = Set(Some(avatar.clone()));
+    }
+
+    if let Some(phone_number) = &update_data.phone_number {
+        active_model.phone_number = Set(phone_number.clone());
+    }
+
+    if let Some(role_id) = &update_data.role_id {
+        active_model.role_id = Set(Uuid::parse_str(role_id).unwrap());
+    }
+
+    if let Some(student_type) = &update_data.student_type {
+        active_model.student_type = Set(student_type.clone());
+    }
+
+    if let Some(birthdate) = &update_data.birthdate {
+        match NaiveDate::parse_from_str(birthdate, "%Y-%m-%d") {
+            Ok(parsed_date) => match parsed_date.and_hms_opt(0, 0, 0) {
+                Some(naive_datetime) => {
+                    let datetime = naive_datetime.and_local_timezone(Utc).unwrap();
+                    active_model.birth_date = Set(Some(datetime));
+                }
+                None => {
+                    return common_response(
+                        StatusCode::BAD_REQUEST,
+                        "Invalid time components in birthdate",
+                    );
+                }
+            },
+            Err(_) => {
+                return common_response(
+                    StatusCode::BAD_REQUEST,
+                    "Invalid birthdate format. Use YYYY-MM-DD.",
+                );
+            }
+        }
+    }
+
+    if let Some(gender) = &update_data.gender {
+        active_model.gender = Set(Some(gender.clone()));
+    }
+
+    if let Some(identity_number) = &update_data.identity_number {
+        active_model.identity_number = Set(Some(identity_number.clone()));
+    }
+
+    if let Some(religion) = &update_data.religion {
+        active_model.religion = Set(Some(religion.clone()));
+    }
+
+    active_model.updated_at = Set(Some(Utc::now()));
+
+    match active_model.update(&db).await {
+        Ok(_) => common_response(StatusCode::OK, "User updated successfully"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    }
 }
