@@ -30,6 +30,11 @@ pub struct UsersUpdateRequestDto {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct UsersActiveInactiveRequestDto {
+    pub is_active: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UsersItemDto {
     pub id: String,
     pub fullname: String,

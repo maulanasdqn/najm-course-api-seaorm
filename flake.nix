@@ -1,5 +1,5 @@
 {
-  description = "TryOutAPI Nix Flake";
+  description = "NAJM Course API Nix Flake";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };

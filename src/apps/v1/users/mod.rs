@@ -17,5 +17,6 @@ pub fn users_router() -> Router {
         .route("/create", post(users_controller::post_create_user))
         .route("/detail/{id}", get(users_controller::get_detail_user))
         .route("/update/{id}", put(users_controller::put_update_user))
+        .route("/activate/{id}", put(users_controller::put_activate_user))
         .route("/delete/{id}", delete(users_controller::delete_user))
 }

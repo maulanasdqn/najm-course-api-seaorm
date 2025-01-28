@@ -12,7 +12,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use super::users_dto::{UsersCreateRequestDto, UsersItemDto, UsersItemListDto};
-use super::UsersUpdateRequestDto;
+use super::{UsersActiveInactiveRequestDto, UsersUpdateRequestDto};
 use crate::permissions::PermissionsItemDto;
 use crate::roles::RolesItemDto;
 use crate::schemas::{
@@ -473,6 +473,38 @@ pub async fn mutation_update_user(
         active_model.religion = Set(Some(religion.clone()));
     }
 
+    active_model.updated_at = Set(Some(Utc::now()));
+
+    match active_model.update(&db).await {
+        Ok(_) => common_response(StatusCode::OK, "User updated successfully"),
+        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    }
+}
+
+pub async fn mutation_set_active_inactive_user(
+    id: String,
+    Json(update_data): Json<UsersActiveInactiveRequestDto>,
+) -> Response {
+    let db = get_db().await;
+
+    let user_id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+    };
+
+    let user = match UsersEntity::find()
+        .filter(UsersColumn::Id.eq(user_id))
+        .filter(UsersColumn::IsDeleted.eq(false))
+        .one(&db)
+        .await
+    {
+        Ok(Some(user)) => user,
+        Ok(None) => return common_response(StatusCode::NOT_FOUND, "User not found"),
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let mut active_model: UsersActiveModel = user.into();
+    active_model.is_active = Set(update_data.is_active);
     active_model.updated_at = Set(Some(Utc::now()));
 
     match active_model.update(&db).await {

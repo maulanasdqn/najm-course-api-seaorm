@@ -27,7 +27,7 @@ pkgs.mkShell {
         - helpme:           show this messages
 
       Repository:
-        - https://github.com/maulanasdqn/try-out-api
+        - https://github.com/maulanasdqn/najm-course-api
       [Info]===============================================================>
       "
       echo "$__usage"
@@ -47,6 +47,7 @@ pkgs.mkShell {
       echo "Building project..."
       crate2nix generate
       nix build -f Cargo.nix
+      echo "Now you can start the project with the command 'start'"
     '')
 
     (writeScriptBin "start-docker" ''
@@ -67,7 +68,7 @@ pkgs.mkShell {
     if [ -f .env ]; then
        echo "Loading .env file..."
        export $(cat .env | xargs)
-       echo "Successfully loaded .env file."
+       echo "Successfully applied .env file."
      else
        echo ".env file not found."
      fi

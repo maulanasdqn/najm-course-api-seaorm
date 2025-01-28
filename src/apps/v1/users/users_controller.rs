@@ -8,10 +8,11 @@ use hyper::HeaderMap;
 use crate::{MessageResponseDto, MetaRequestDto, ResponseSuccessDto, ResponseSuccessListDto};
 
 use super::{
-    mutation_delete_user, mutation_update_user, query_get_user_me,
+    mutation_delete_user, mutation_set_active_inactive_user, mutation_update_user,
+    query_get_user_me,
     users_dto::{UsersCreateRequestDto, UsersUpdateRequestDto},
     users_repository::{mutation_create_users, query_get_user_by_id, query_get_users},
-    UsersItemDto, UsersItemListDto,
+    UsersActiveInactiveRequestDto, UsersItemDto, UsersItemListDto,
 };
 
 #[utoipa::path(
@@ -120,4 +121,25 @@ pub async fn put_update_user(
     Json(payload): Json<UsersUpdateRequestDto>,
 ) -> impl IntoResponse {
     mutation_update_user(id, Json(payload)).await
+}
+
+#[utoipa::path(
+    put,
+    path = "/v1/users/activate/{id}",
+    request_body = UsersActiveInactiveRequestDto,
+    security(
+        ("Bearer" = [])
+    ),
+    responses(
+        (status = 201, description = "User Updated", body = MessageResponseDto),
+        (status = 400, description = "Invalid User data", body = MessageResponseDto)
+    ),
+    tag = "Users"
+)]
+
+pub async fn put_activate_user(
+    Path(id): Path<String>,
+    Json(payload): Json<UsersActiveInactiveRequestDto>,
+) -> impl IntoResponse {
+    mutation_set_active_inactive_user(id, Json(payload)).await
 }
