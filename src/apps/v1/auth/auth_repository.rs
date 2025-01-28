@@ -10,9 +10,9 @@ use crate::{
     common_response, connect_redis, decode_access_token, decode_refresh_token, encode_access_token,
     encode_refresh_token, get_db, hash_password,
     permissions::PermissionsItemDto,
-    roles::RolesItemDto,
+    roles::{RolesEnum, RolesItemDto},
     schemas::{
-        PermissionsColumn, PermissionsEntity, RolesColumn, RolesEntity, RolesPermissionsColumn,
+        PermissionsEntity, RolesColumn, RolesEntity, RolesPermissionsColumn,
         RolesPermissionsEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation,
     },
     send_email, success_response, verify_password, OtpManager, ResponseSuccessDto,
@@ -106,26 +106,25 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
     let refresh_token = encode_refresh_token(email.clone()).unwrap();
 
     let permissions = if let Some(role_id) = role_id {
-        PermissionsEntity::find()
-            .join(
-                JoinType::InnerJoin,
-                RolesPermissionsEntity::belongs_to(PermissionsEntity)
-                    .from(RolesPermissionsColumn::PermissionId)
-                    .to(PermissionsColumn::Id)
-                    .into(),
-            )
+        match RolesPermissionsEntity::find()
             .filter(RolesPermissionsColumn::RoleId.eq(role_id))
+            .find_also_related(PermissionsEntity)
             .all(&db)
             .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|perm| PermissionsItemDto {
-                id: perm.id.to_string(),
-                name: perm.name,
-                created_at: perm.created_at.map(|dt| dt.to_string()),
-                updated_at: perm.updated_at.map(|dt| dt.to_string()),
-            })
-            .collect::<Vec<PermissionsItemDto>>()
+        {
+            Ok(data) => data
+                .into_iter()
+                .filter_map(|(_, permission)| {
+                    permission.map(|perm| PermissionsItemDto {
+                        id: perm.id.to_string(),
+                        name: perm.name,
+                        created_at: perm.created_at.map(|dt| dt.to_string()),
+                        updated_at: perm.updated_at.map(|dt| dt.to_string()),
+                    })
+                })
+                .collect::<Vec<PermissionsItemDto>>(),
+            Err(_) => vec![],
+        }
     } else {
         vec![]
     };
@@ -193,7 +192,7 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         .select_only()
         .column(RolesColumn::Id)
         .column(RolesColumn::Name)
-        .filter(RolesColumn::Name.eq("Student"))
+        .filter(RolesColumn::Name.eq(RolesEnum::Student.to_string()))
         .one(&db)
         .await
         .unwrap();

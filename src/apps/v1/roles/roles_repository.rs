@@ -10,16 +10,16 @@ use crate::{
     common_response, get_db,
     permissions::PermissionsItemDto,
     schemas::{
-        PermissionsColumn, PermissionsEntity, RolesActiveModel, RolesColumn, RolesEntity,
-        RolesPermissionsActiveModel, RolesPermissionsColumn, RolesPermissionsEntity,
+        PermissionsEntity, RolesActiveModel, RolesColumn, RolesEntity, RolesPermissionsActiveModel,
+        RolesPermissionsColumn, RolesPermissionsEntity,
     },
     success_response, success_response_list, MetaRequestDto, MetaResponseDto, ResponseSuccessDto,
     ResponseSuccessListDto,
 };
 
 use super::{
-    roles_dto::{RolesItemDto, RolesRequestDto},
-    RolesItemListDto,
+    roles_dto::{RolesItemDto, RolesRequestCreateDto},
+    RolesItemListDto, RolesRequestUpdateDto,
 };
 
 pub async fn query_get_roles(params: MetaRequestDto) -> Response {
@@ -98,13 +98,6 @@ pub async fn query_get_role_by_id(id: String) -> Response {
     };
 
     let permissions = match RolesPermissionsEntity::find()
-        .join(
-            sea_orm::JoinType::InnerJoin,
-            RolesPermissionsEntity::belongs_to(PermissionsEntity)
-                .from(RolesPermissionsColumn::PermissionId)
-                .to(PermissionsColumn::Id)
-                .into(),
-        )
         .filter(RolesPermissionsColumn::RoleId.eq(role.id))
         .find_also_related(PermissionsEntity)
         .all(&db)
@@ -134,11 +127,10 @@ pub async fn query_get_role_by_id(id: String) -> Response {
     };
 
     let response = ResponseSuccessDto { data: role_dto };
-
     success_response(response)
 }
 
-pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> Response {
+pub async fn mutation_create_role(payload: Json<RolesRequestCreateDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
 
     if let Ok(Some(_)) = RolesEntity::find()
@@ -180,7 +172,7 @@ pub async fn mutation_create_role(payload: Json<RolesRequestDto>) -> Response {
     common_response(StatusCode::CREATED, "Role created successfully")
 }
 
-pub async fn mutation_update_role(id: String, payload: Json<RolesRequestDto>) -> Response {
+pub async fn mutation_update_role(id: String, payload: Json<RolesRequestUpdateDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
 
     let role_id = match Uuid::parse_str(&id) {
@@ -200,8 +192,8 @@ pub async fn mutation_update_role(id: String, payload: Json<RolesRequestDto>) ->
 
     let mut active_model: RolesActiveModel = role.into();
 
-    if !payload.name.is_empty() {
-        active_model.name = Set(payload.name.clone());
+    if let Some(name) = &payload.name {
+        active_model.name = Set(name.clone());
     }
     active_model.updated_at = Set(Some(chrono::Utc::now()));
 
@@ -211,28 +203,39 @@ pub async fn mutation_update_role(id: String, payload: Json<RolesRequestDto>) ->
     };
 
     if let Some(permission_ids) = &payload.permissions {
-        if let Err(err) = RolesPermissionsEntity::delete_many()
+        let existing_permissions: Vec<Uuid> = match RolesPermissionsEntity::find()
             .filter(RolesPermissionsColumn::RoleId.eq(updated_role.id))
-            .exec(&db)
+            .select_only()
+            .column(RolesPermissionsColumn::PermissionId)
+            .into_tuple::<Uuid>()
+            .all(&db)
             .await
         {
-            return common_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                &format!("Failed to clear existing permissions: {}", err),
-            );
-        }
+            Ok(permissions) => permissions,
+            Err(err) => {
+                return common_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Failed to fetch existing permissions: {}", err),
+                );
+            }
+        };
 
         for permission_id in permission_ids {
-            let role_permission = RolesPermissionsActiveModel {
-                id: Set(Uuid::new_v4()),
-                role_id: Set(updated_role.id),
-                permission_id: Set(
-                    Uuid::parse_str(permission_id).unwrap_or_else(|_| Uuid::new_v4())
-                ),
+            let parsed_permission_id = match Uuid::parse_str(permission_id) {
+                Ok(id) => id,
+                Err(_) => continue,
             };
 
-            if let Err(err) = role_permission.insert(&db).await {
-                return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+            if !existing_permissions.contains(&parsed_permission_id) {
+                let role_permission = RolesPermissionsActiveModel {
+                    id: Set(Uuid::new_v4()),
+                    role_id: Set(updated_role.id),
+                    permission_id: Set(parsed_permission_id),
+                };
+
+                if let Err(err) = role_permission.insert(&db).await {
+                    return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+                }
             }
         }
     }

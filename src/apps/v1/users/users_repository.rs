@@ -16,8 +16,8 @@ use super::{UsersActiveInactiveRequestDto, UsersUpdateRequestDto};
 use crate::permissions::PermissionsItemDto;
 use crate::roles::RolesItemDto;
 use crate::schemas::{
-    PermissionsColumn, PermissionsEntity, RolesEntity, RolesPermissionsColumn,
-    RolesPermissionsEntity, UsersActiveModel, UsersColumn, UsersEntity, UsersRelation,
+    PermissionsEntity, RolesEntity, RolesPermissionsColumn, RolesPermissionsEntity,
+    UsersActiveModel, UsersColumn, UsersEntity, UsersRelation,
 };
 use crate::{
     common_response, decode_access_token, get_db, hash_password, success_response,
@@ -108,28 +108,25 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
         .await
     {
         Ok(Some((user, Some(role)))) => {
-            let permissions = PermissionsEntity::find()
-                .join(
-                    JoinType::InnerJoin,
-                    RolesPermissionsEntity::belongs_to(PermissionsEntity)
-                        .from(RolesPermissionsColumn::PermissionId)
-                        .to(PermissionsColumn::Id)
-                        .into(),
-                )
+            let permissions = RolesPermissionsEntity::find()
                 .filter(RolesPermissionsColumn::RoleId.eq(role.id))
+                .find_also_related(PermissionsEntity)
                 .all(&db)
-                .await
-                .unwrap_or_default();
+                .await;
 
-            let role_permissions = permissions
-                .into_iter()
-                .map(|perm| PermissionsItemDto {
-                    id: perm.id.to_string(),
-                    name: perm.name,
-                    created_at: perm.created_at.map(|dt| dt.to_string()),
-                    updated_at: perm.updated_at.map(|dt| dt.to_string()),
-                })
-                .collect::<Vec<PermissionsItemDto>>();
+            let role_permissions = match permissions {
+                Ok(data) => data
+                    .into_iter()
+                    .filter_map(|(_, permission)| permission)
+                    .map(|perm| PermissionsItemDto {
+                        id: perm.id.to_string(),
+                        name: perm.name,
+                        created_at: perm.created_at.map(|dt| dt.to_string()),
+                        updated_at: perm.updated_at.map(|dt| dt.to_string()),
+                    })
+                    .collect::<Vec<PermissionsItemDto>>(),
+                Err(_) => vec![],
+            };
 
             let role_dto = RolesItemDto {
                 id: role.id.to_string(),
@@ -196,28 +193,25 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
         .await
     {
         Ok(Some((user, Some(role)))) => {
-            let permissions = PermissionsEntity::find()
-                .join(
-                    sea_orm::JoinType::InnerJoin,
-                    RolesPermissionsEntity::belongs_to(PermissionsEntity)
-                        .from(RolesPermissionsColumn::PermissionId)
-                        .to(PermissionsColumn::Id)
-                        .into(),
-                )
+            let permissions = RolesPermissionsEntity::find()
                 .filter(RolesPermissionsColumn::RoleId.eq(role.id))
+                .find_also_related(PermissionsEntity)
                 .all(&db)
-                .await
-                .unwrap_or_default();
+                .await;
 
-            let role_permissions = permissions
-                .into_iter()
-                .map(|perm| PermissionsItemDto {
-                    id: perm.id.to_string(),
-                    name: perm.name,
-                    created_at: perm.created_at.map(|dt| dt.to_string()),
-                    updated_at: perm.updated_at.map(|dt| dt.to_string()),
-                })
-                .collect::<Vec<PermissionsItemDto>>();
+            let role_permissions = match permissions {
+                Ok(data) => data
+                    .into_iter()
+                    .filter_map(|(_, permission)| permission)
+                    .map(|perm| PermissionsItemDto {
+                        id: perm.id.to_string(),
+                        name: perm.name,
+                        created_at: perm.created_at.map(|dt| dt.to_string()),
+                        updated_at: perm.updated_at.map(|dt| dt.to_string()),
+                    })
+                    .collect::<Vec<PermissionsItemDto>>(),
+                Err(_) => vec![], // Return empty array if permission query fails
+            };
 
             let role_dto = RolesItemDto {
                 id: role.id.to_string(),
@@ -302,6 +296,10 @@ pub async fn query_get_users(params: MetaRequestDto) -> Response {
         }
     }
 
+    if filter_by == "student_type" && !filter.is_empty() {
+        query = query.filter(UsersColumn::StudentType.eq(filter));
+    }
+
     query = match (sort_by.as_str(), order.as_str()) {
         ("fullname", "asc") => query.order_by_asc(UsersColumn::Fullname),
         ("fullname", "desc") => query.order_by_desc(UsersColumn::Fullname),
@@ -343,6 +341,7 @@ pub async fn query_get_users(params: MetaRequestDto) -> Response {
             phone_number: user.phone_number,
             referral_code: user.referral_code,
             referred_by: user.referred_by,
+            is_active: user.is_active,
             role: role.map(|r| r.name).unwrap_or_else(|| "-".to_string()),
             created_at: user.created_at.map(|dt| dt.to_string()),
             updated_at: user.updated_at.map(|dt| dt.to_string()),

@@ -1,10 +1,12 @@
 use axum::{
     extract::{Path, Query},
+    http::HeaderMap,
     response::IntoResponse,
     Json,
 };
 
 use crate::{
+    permissions::{permissions_middleware, PermissionsEnum},
     utils::dto::{MessageResponseDto, MetaRequestDto},
     ResponseSuccessDto, ResponseSuccessListDto,
 };
@@ -27,9 +29,14 @@ use super::{
     ),
     tag = "Permissions"
 )]
-
-pub async fn get_permissions(Query(params): Query<MetaRequestDto>) -> impl IntoResponse {
-    query_get_permissions(params).await
+pub async fn get_permissions(
+    headers: HeaderMap,
+    Query(params): Query<MetaRequestDto>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::ReadListPermissions]).await {
+        Ok(_) => query_get_permissions(params).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -44,9 +51,14 @@ pub async fn get_permissions(Query(params): Query<MetaRequestDto>) -> impl IntoR
     ),
     tag = "Permissions"
 )]
-
-pub async fn get_detail_permission(Path(id): Path<String>) -> impl IntoResponse {
-    query_get_permission_by_id(id).await
+pub async fn get_detail_permission(
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::ReadDetailPermissions]).await {
+        Ok(_) => query_get_permission_by_id(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -62,11 +74,14 @@ pub async fn get_detail_permission(Path(id): Path<String>) -> impl IntoResponse 
     ),
     tag = "Permissions"
 )]
-
 pub async fn post_create_permission(
+    headers: HeaderMap,
     Json(payload): Json<PermissionsRequestDto>,
 ) -> impl IntoResponse {
-    mutation_create_permission(Json(payload)).await
+    match permissions_middleware(headers, vec![PermissionsEnum::CreatePermissions]).await {
+        Ok(_) => mutation_create_permission(Json(payload)).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -81,9 +96,11 @@ pub async fn post_create_permission(
     ),
     tag = "Permissions"
 )]
-
-pub async fn delete_permission(Path(id): Path<String>) -> impl IntoResponse {
-    mutation_delete_permission(id).await
+pub async fn delete_permission(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::DeletePermissions]).await {
+        Ok(_) => mutation_delete_permission(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -99,10 +116,13 @@ pub async fn delete_permission(Path(id): Path<String>) -> impl IntoResponse {
     ),
     tag = "Permissions"
 )]
-
 pub async fn put_update_permission(
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(payload): Json<PermissionsRequestDto>,
 ) -> impl IntoResponse {
-    mutation_update_permission(id, Json(payload)).await
+    match permissions_middleware(headers, vec![PermissionsEnum::UpdatePermissions]).await {
+        Ok(_) => mutation_update_permission(id, Json(payload)).await,
+        Err(response) => response,
+    }
 }

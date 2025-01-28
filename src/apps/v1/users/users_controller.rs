@@ -5,7 +5,10 @@ use axum::{
 };
 use hyper::HeaderMap;
 
-use crate::{MessageResponseDto, MetaRequestDto, ResponseSuccessDto, ResponseSuccessListDto};
+use crate::{
+    permissions::{permissions_middleware, PermissionsEnum},
+    MessageResponseDto, MetaRequestDto, ResponseSuccessDto, ResponseSuccessListDto,
+};
 
 use super::{
     mutation_delete_user, mutation_set_active_inactive_user, mutation_update_user,
@@ -28,9 +31,14 @@ use super::{
     ),
     tag = "Users"
 )]
-
-pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoResponse {
-    query_get_users(params).await
+pub async fn get_users(
+    headers: HeaderMap,
+    Query(params): Query<MetaRequestDto>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::ReadListUsers]).await {
+        Ok(_) => query_get_users(params).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -45,9 +53,11 @@ pub async fn get_users(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
     ),
     tag = "Users"
 )]
-
-pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
-    query_get_user_by_id(id).await
+pub async fn get_detail_user(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::ReadDetailUsers]).await {
+        Ok(_) => query_get_user_by_id(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -62,9 +72,8 @@ pub async fn get_detail_user(Path(id): Path<String>) -> impl IntoResponse {
     ),
     tag = "Users"
 )]
-
-pub async fn get_user_me(header: HeaderMap) -> impl IntoResponse {
-    query_get_user_me(header).await
+pub async fn get_user_me(headers: HeaderMap) -> impl IntoResponse {
+    query_get_user_me(headers).await
 }
 
 #[utoipa::path(
@@ -80,9 +89,14 @@ pub async fn get_user_me(header: HeaderMap) -> impl IntoResponse {
     ),
     tag = "Users"
 )]
-
-pub async fn post_create_user(Json(payload): Json<UsersCreateRequestDto>) -> impl IntoResponse {
-    mutation_create_users(Json(payload)).await
+pub async fn post_create_user(
+    headers: HeaderMap,
+    Json(payload): Json<UsersCreateRequestDto>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::CreateUsers]).await {
+        Ok(_) => mutation_create_users(Json(payload)).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -97,9 +111,11 @@ pub async fn post_create_user(Json(payload): Json<UsersCreateRequestDto>) -> imp
     ),
     tag = "Users"
 )]
-
-pub async fn delete_user(Path(id): Path<String>) -> impl IntoResponse {
-    mutation_delete_user(id).await
+pub async fn delete_user(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::DeleteUsers]).await {
+        Ok(_) => mutation_delete_user(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -115,12 +131,15 @@ pub async fn delete_user(Path(id): Path<String>) -> impl IntoResponse {
     ),
     tag = "Users"
 )]
-
 pub async fn put_update_user(
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(payload): Json<UsersUpdateRequestDto>,
 ) -> impl IntoResponse {
-    mutation_update_user(id, Json(payload)).await
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::UpdateUsers]).await {
+        Ok(_) => mutation_update_user(id, Json(payload)).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -136,10 +155,13 @@ pub async fn put_update_user(
     ),
     tag = "Users"
 )]
-
 pub async fn put_activate_user(
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(payload): Json<UsersActiveInactiveRequestDto>,
 ) -> impl IntoResponse {
-    mutation_set_active_inactive_user(id, Json(payload)).await
+    match permissions_middleware(headers.clone(), vec![PermissionsEnum::UpdateUsers]).await {
+        Ok(_) => mutation_set_active_inactive_user(id, Json(payload)).await,
+        Err(response) => response,
+    }
 }

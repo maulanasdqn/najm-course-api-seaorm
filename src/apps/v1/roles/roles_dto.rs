@@ -4,7 +4,13 @@ use utoipa::ToSchema;
 use crate::permissions::PermissionsItemDto;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct RolesRequestDto {
+pub struct RolesRequestUpdateDto {
+    pub name: Option<String>,
+    pub permissions: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct RolesRequestCreateDto {
     pub name: String,
     pub permissions: Option<Vec<String>>,
 }

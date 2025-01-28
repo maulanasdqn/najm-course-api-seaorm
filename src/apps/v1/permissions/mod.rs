@@ -5,10 +5,13 @@ use axum::{
 
 pub mod permissions_controller;
 pub mod permissions_dto;
+pub mod permissions_enum;
 pub mod permissions_middleware;
 pub mod permissions_repository;
 
 pub use permissions_dto::*;
+pub use permissions_enum::*;
+pub use permissions_middleware::*;
 pub use permissions_repository::*;
 
 pub fn permissions_router() -> Router {

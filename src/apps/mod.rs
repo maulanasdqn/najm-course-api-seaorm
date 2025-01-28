@@ -81,7 +81,8 @@ pub async fn root_routes() -> Router {
                 v1::users::users_dto::UsersItemDto,
                 v1::roles::roles_dto::RolesItemDto,
                 v1::roles::roles_dto::RolesItemListDto,
-                v1::roles::roles_dto::RolesRequestDto,
+                v1::roles::roles_dto::RolesRequestCreateDto,
+                v1::roles::roles_dto::RolesRequestUpdateDto,
                 v1::permissions::permissions_dto::PermissionsItemDto,
                 v1::permissions::permissions_dto::PermissionsRequestDto,
             )

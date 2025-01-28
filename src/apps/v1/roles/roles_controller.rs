@@ -1,19 +1,21 @@
 use axum::{
     extract::{Path, Query},
+    http::HeaderMap,
     response::IntoResponse,
     Json,
 };
 
 use crate::{
+    permissions::{permissions_middleware, PermissionsEnum},
     utils::dto::{MessageResponseDto, MetaRequestDto},
     ResponseSuccessDto, ResponseSuccessListDto,
 };
 
 use super::{
     mutation_delete_role, mutation_update_role,
-    roles_dto::RolesRequestDto,
+    roles_dto::RolesRequestUpdateDto,
     roles_repository::{mutation_create_role, query_get_role_by_id, query_get_roles},
-    RolesItemDto, RolesItemListDto,
+    RolesItemDto, RolesItemListDto, RolesRequestCreateDto,
 };
 
 #[utoipa::path(
@@ -29,9 +31,14 @@ use super::{
     ),
     tag = "Roles"
 )]
-
-pub async fn get_roles(Query(params): Query<MetaRequestDto>) -> impl IntoResponse {
-    query_get_roles(params).await
+pub async fn get_roles(
+    headers: HeaderMap,
+    Query(params): Query<MetaRequestDto>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::ReadListRoles]).await {
+        Ok(_) => query_get_roles(params).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -46,15 +53,17 @@ pub async fn get_roles(Query(params): Query<MetaRequestDto>) -> impl IntoRespons
     ),
     tag = "Roles"
 )]
-
-pub async fn get_detail_role(Path(id): Path<String>) -> impl IntoResponse {
-    query_get_role_by_id(id).await
+pub async fn get_detail_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::ReadDetailRoles]).await {
+        Ok(_) => query_get_role_by_id(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
     post,
     path = "/v1/roles/create",
-    request_body = RolesRequestDto,
+    request_body = RolesRequestCreateDto,
     security(
         ("Bearer" = [])
     ),
@@ -64,9 +73,14 @@ pub async fn get_detail_role(Path(id): Path<String>) -> impl IntoResponse {
     ),
     tag = "Roles"
 )]
-
-pub async fn post_create_role(Json(payload): Json<RolesRequestDto>) -> impl IntoResponse {
-    mutation_create_role(Json(payload)).await
+pub async fn post_create_role(
+    headers: HeaderMap,
+    Json(payload): Json<RolesRequestCreateDto>,
+) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::CreateRoles]).await {
+        Ok(_) => mutation_create_role(Json(payload)).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
@@ -81,15 +95,17 @@ pub async fn post_create_role(Json(payload): Json<RolesRequestDto>) -> impl Into
     ),
     tag = "Roles"
 )]
-
-pub async fn delete_role(Path(id): Path<String>) -> impl IntoResponse {
-    mutation_delete_role(id).await
+pub async fn delete_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
+    match permissions_middleware(headers, vec![PermissionsEnum::DeleteRoles]).await {
+        Ok(_) => mutation_delete_role(id).await,
+        Err(response) => response,
+    }
 }
 
 #[utoipa::path(
     put,
     path = "/v1/roles/update/{id}",
-    request_body = RolesRequestDto,
+    request_body = RolesRequestUpdateDto,
     security(
         ("Bearer" = [])
     ),
@@ -99,10 +115,13 @@ pub async fn delete_role(Path(id): Path<String>) -> impl IntoResponse {
     ),
     tag = "Roles"
 )]
-
 pub async fn put_update_role(
+    headers: HeaderMap,
     Path(id): Path<String>,
-    Json(payload): Json<RolesRequestDto>,
+    Json(payload): Json<RolesRequestUpdateDto>,
 ) -> impl IntoResponse {
-    mutation_update_role(id, Json(payload)).await
+    match permissions_middleware(headers, vec![PermissionsEnum::UpdateRoles]).await {
+        Ok(_) => mutation_update_role(id, Json(payload)).await,
+        Err(response) => response,
+    }
 }

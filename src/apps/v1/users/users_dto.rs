@@ -63,6 +63,7 @@ pub struct UsersItemListDto {
     pub referral_code: Option<String>,
     pub referred_by: Option<String>,
     pub role: String,
+    pub is_active: bool,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
