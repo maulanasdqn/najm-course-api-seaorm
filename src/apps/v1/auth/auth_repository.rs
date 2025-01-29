@@ -83,9 +83,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
             role_name,
         ),
         Ok(None) => return common_response(StatusCode::UNAUTHORIZED, "Email or password invalid"),
-        Err(_) => {
-            return common_response(StatusCode::INTERNAL_SERVER_ERROR, "Database query failed")
-        }
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     };
 
     let (id, email, hashed_password, is_active, fullname, avatar, phone_number, role_id, role_name) =
@@ -97,7 +95,7 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
 
     if !is_active {
         return common_response(
-            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
             "Your account is not active, please verify your email",
         );
     }
