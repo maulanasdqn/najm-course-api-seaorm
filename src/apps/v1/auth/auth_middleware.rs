@@ -47,7 +47,7 @@ pub async fn authorization_middleware(
         }
     };
 
-    let token_data = match decode_access_token(token.to_string()) {
+    let token_data = match decode_access_token(&token) {
         Ok(data) => data,
         Err(_) => {
             return Ok(common_response(

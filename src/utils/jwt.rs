@@ -11,7 +11,7 @@ pub struct Claims {
     pub email: String,
 }
 
-pub fn encode_access_token(email: String) -> Result<String, StatusCode> {
+pub fn encode_access_token(email: &str) -> Result<String, StatusCode> {
     let secret: String = env::var("ACCESS_TOKEN_SECRET")
         .expect("ACCESS_TOKEN_SECRET must be set")
         .to_string();
@@ -19,7 +19,11 @@ pub fn encode_access_token(email: String) -> Result<String, StatusCode> {
     let expire: chrono::TimeDelta = Duration::minutes(15);
     let exp: usize = (now + expire).timestamp() as usize;
     let iat: usize = now.timestamp() as usize;
-    let claim = Claims { iat, exp, email };
+    let claim = Claims {
+        iat,
+        exp,
+        email: email.to_string(),
+    };
     encode(
         &Header::default(),
         &claim,
@@ -28,7 +32,7 @@ pub fn encode_access_token(email: String) -> Result<String, StatusCode> {
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-pub fn decode_access_token(jwt_token: String) -> Result<TokenData<Claims>, StatusCode> {
+pub fn decode_access_token(jwt_token: &str) -> Result<TokenData<Claims>, StatusCode> {
     let secret = env::var("ACCESS_TOKEN_SECRET")
         .expect("ACCESS_TOKEN_SECRET must be set")
         .to_string();
@@ -41,7 +45,7 @@ pub fn decode_access_token(jwt_token: String) -> Result<TokenData<Claims>, Statu
     result
 }
 
-pub fn encode_refresh_token(email: String) -> Result<String, StatusCode> {
+pub fn encode_refresh_token(email: &str) -> Result<String, StatusCode> {
     let secret: String = env::var("REFRESH_TOKEN_SECRET")
         .expect("REFRESH_TOKEN_SECRET must be set")
         .to_string();
@@ -49,7 +53,11 @@ pub fn encode_refresh_token(email: String) -> Result<String, StatusCode> {
     let expire: chrono::TimeDelta = Duration::days(1);
     let exp: usize = (now + expire).timestamp() as usize;
     let iat: usize = now.timestamp() as usize;
-    let claim = Claims { iat, exp, email };
+    let claim = Claims {
+        iat,
+        exp,
+        email: email.to_string(),
+    };
     encode(
         &Header::default(),
         &claim,
@@ -58,7 +66,7 @@ pub fn encode_refresh_token(email: String) -> Result<String, StatusCode> {
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-pub fn decode_refresh_token(jwt_token: String) -> Result<TokenData<Claims>, StatusCode> {
+pub fn decode_refresh_token(jwt_token: &str) -> Result<TokenData<Claims>, StatusCode> {
     let secret = env::var("REFRESH_TOKEN_SECRET")
         .expect("REFRESH_TOKEN_SECRET must be set")
         .to_string();

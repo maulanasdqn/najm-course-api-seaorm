@@ -35,7 +35,7 @@ pub async fn get_users(
     headers: HeaderMap,
     Query(params): Query<MetaRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::ReadListUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::ReadListUsers]).await {
         Ok(_) => query_get_users(params).await,
         Err(response) => response,
     }
@@ -54,7 +54,7 @@ pub async fn get_users(
     tag = "Users"
 )]
 pub async fn get_detail_user(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::ReadDetailUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::ReadDetailUsers]).await {
         Ok(_) => query_get_user_by_id(id).await,
         Err(response) => response,
     }
@@ -93,7 +93,7 @@ pub async fn post_create_user(
     headers: HeaderMap,
     Json(payload): Json<UsersCreateRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::CreateUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::CreateUsers]).await {
         Ok(_) => mutation_create_users(Json(payload)).await,
         Err(response) => response,
     }
@@ -112,7 +112,7 @@ pub async fn post_create_user(
     tag = "Users"
 )]
 pub async fn delete_user(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::DeleteUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::DeleteUsers]).await {
         Ok(_) => mutation_delete_user(id).await,
         Err(response) => response,
     }
@@ -136,7 +136,7 @@ pub async fn put_update_user(
     Path(id): Path<String>,
     Json(payload): Json<UsersUpdateRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::UpdateUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::UpdateUsers]).await {
         Ok(_) => mutation_update_user(id, Json(payload)).await,
         Err(response) => response,
     }
@@ -160,7 +160,7 @@ pub async fn put_activate_user(
     Path(id): Path<String>,
     Json(payload): Json<UsersActiveInactiveRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers.clone(), vec![PermissionsEnum::UpdateUsers]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::UpdateUsers]).await {
         Ok(_) => mutation_set_active_inactive_user(id, Json(payload)).await,
         Err(response) => response,
     }

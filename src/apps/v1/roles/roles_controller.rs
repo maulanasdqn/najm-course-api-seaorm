@@ -35,7 +35,7 @@ pub async fn get_roles(
     headers: HeaderMap,
     Query(params): Query<MetaRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers, vec![PermissionsEnum::ReadListRoles]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::ReadListRoles]).await {
         Ok(_) => query_get_roles(params).await,
         Err(response) => response,
     }
@@ -54,7 +54,7 @@ pub async fn get_roles(
     tag = "Roles"
 )]
 pub async fn get_detail_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(headers, vec![PermissionsEnum::ReadDetailRoles]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::ReadDetailRoles]).await {
         Ok(_) => query_get_role_by_id(id).await,
         Err(response) => response,
     }
@@ -77,7 +77,7 @@ pub async fn post_create_role(
     headers: HeaderMap,
     Json(payload): Json<RolesRequestCreateDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers, vec![PermissionsEnum::CreateRoles]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::CreateRoles]).await {
         Ok(_) => mutation_create_role(Json(payload)).await,
         Err(response) => response,
     }
@@ -96,7 +96,7 @@ pub async fn post_create_role(
     tag = "Roles"
 )]
 pub async fn delete_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(headers, vec![PermissionsEnum::DeleteRoles]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::DeleteRoles]).await {
         Ok(_) => mutation_delete_role(id).await,
         Err(response) => response,
     }
@@ -120,7 +120,7 @@ pub async fn put_update_role(
     Path(id): Path<String>,
     Json(payload): Json<RolesRequestUpdateDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(headers, vec![PermissionsEnum::UpdateRoles]).await {
+    match permissions_middleware(&headers, vec![PermissionsEnum::UpdateRoles]).await {
         Ok(_) => mutation_update_role(id, Json(payload)).await,
         Err(response) => response,
     }

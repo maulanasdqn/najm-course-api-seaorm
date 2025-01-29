@@ -36,7 +36,7 @@ pub async fn mutation_create_users(new_user: Json<UsersCreateRequestDto>) -> Res
     }
 
     if let Ok(Some(_)) = UsersEntity::find()
-        .filter(UsersColumn::Email.eq(new_user.email.clone()))
+        .filter(UsersColumn::Email.eq(&new_user.email))
         .one(&db)
         .await
     {
@@ -84,7 +84,7 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
 
     let auth_header = match auth_header {
         Ok(header) => header,
-        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid header format"),
+        Err(err) => return common_response(StatusCode::BAD_REQUEST, &err.to_string()),
     };
 
     let mut header_parts = auth_header.split_whitespace();
@@ -94,9 +94,9 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
         None => return common_response(StatusCode::BAD_REQUEST, "Invalid token format"),
     };
 
-    let token_data = match decode_access_token(token.to_string()) {
+    let token_data = match decode_access_token(&token) {
         Ok(data) => data,
-        Err(_) => return common_response(StatusCode::UNAUTHORIZED, "Invalid or expired token"),
+        Err(err) => return common_response(StatusCode::UNAUTHORIZED, &err.to_string()),
     };
 
     let email = token_data.claims.email;
@@ -210,7 +210,7 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
                         updated_at: perm.updated_at.map(|dt| dt.to_string()),
                     })
                     .collect::<Vec<PermissionsItemDto>>(),
-                Err(_) => vec![], // Return empty array if permission query fails
+                Err(_) => vec![],
             };
 
             let role_dto = RolesItemDto {
@@ -365,7 +365,7 @@ pub async fn mutation_delete_user(user_id: String) -> Response {
 
     let user_id = match Uuid::parse_str(&user_id) {
         Ok(id) => id,
-        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+        Err(err) => return common_response(StatusCode::BAD_REQUEST, &err.to_string()),
     };
 
     let user = match UsersEntity::find()
@@ -397,7 +397,7 @@ pub async fn mutation_update_user(
 
     let user_id = match Uuid::parse_str(&id) {
         Ok(id) => id,
-        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+        Err(err) => return common_response(StatusCode::BAD_REQUEST, &err.to_string()),
     };
 
     let user = match UsersEntity::find()
@@ -488,7 +488,7 @@ pub async fn mutation_set_active_inactive_user(
 
     let user_id = match Uuid::parse_str(&id) {
         Ok(id) => id,
-        Err(_) => return common_response(StatusCode::BAD_REQUEST, "Invalid user ID format"),
+        Err(err) => return common_response(StatusCode::BAD_REQUEST, &err.to_string()),
     };
 
     let user = match UsersEntity::find()

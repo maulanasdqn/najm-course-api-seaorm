@@ -1,53 +1,104 @@
-use crate::roles::RolesItemDto;
+use crate::{common_response, roles::RolesItemDto};
+use axum::response::Response;
+use email_address::EmailAddress;
+use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use validator::Validate;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthLoginRequestDto {
-    #[validate(email(message = "Invalid email format"))]
     pub email: String,
-
-    #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
     pub password: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Validate)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct Email(String);
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct Password(String);
+
+impl Email {
+    pub fn parse(email: &String) -> Result<Email, Response> {
+        match email.is_empty() {
+            true => Err(common_response(
+                StatusCode::BAD_REQUEST,
+                "Email cannot be empty",
+            )),
+            false => match EmailAddress::is_valid(&email) {
+                true => Ok(Email(email.to_string())),
+                false => Err(common_response(
+                    StatusCode::BAD_REQUEST,
+                    "Email must be valid",
+                )),
+            },
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Password {
+    pub fn parse(password: &String) -> Result<Password, Response> {
+        match password.len() {
+            0 => Err(common_response(
+                StatusCode::BAD_REQUEST,
+                "Password cannot be empty",
+            )),
+            1..=7 => Err(common_response(
+                StatusCode::BAD_REQUEST,
+                "Password cannot be empty",
+            )),
+            8..=64 => {
+                let has_uppercase = password.chars().any(|c| c.is_uppercase());
+                let has_lowercase = password.chars().any(|c| c.is_lowercase());
+                let has_digit = password.chars().any(|c| c.is_ascii_digit());
+                match (has_uppercase, has_lowercase, has_digit) {
+                    (true, true, true) => Ok(Password(password.to_string())),
+                    _ => Err(common_response(
+                        StatusCode::BAD_REQUEST,
+                        "Password must contain at least one uppercase letter, one lowercase letter, and one number",
+                    )),
+                }
+            }
+            _ => Err(common_response(
+                StatusCode::BAD_REQUEST,
+                "Password must be at most 64 characters long",
+            )),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthRegisterRequestDto {
-    #[validate(length(min = 1, message = "Fullname is required"))]
     pub fullname: String,
-    #[validate(
-        email(message = "Invalid email format"),
-        length(min = 1, message = "Email is required")
-    )]
     pub email: String,
-    #[validate(length(min = 1, message = "Student type is required"))]
     pub student_type: String,
-    #[validate(length(min = 1, message = "Phone number type is required"))]
     pub phone_number: String,
     pub password: String,
     pub referral_code: Option<String>,
     pub referred_by: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthForgotRequestDto {
-    #[validate(email(message = "Invalid email format"))]
     pub email: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthVerifyEmailRequestDto {
-    #[validate(email(message = "Invalid email format"))]
     pub email: String,
     pub otp: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthNewPasswordRequestDto {
-    #[validate(length(min = 8, message = "Password must be at least 8 characters long"))]
     pub password: String,
-    #[validate(length(min = 1, message = "Token is required"))]
     pub token: String,
 }
 

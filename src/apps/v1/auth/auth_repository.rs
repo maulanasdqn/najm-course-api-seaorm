@@ -19,6 +19,7 @@ use crate::{
 };
 use axum::{http::StatusCode, response::Response, Json};
 use chrono::Utc;
+use email_address::EmailAddress;
 use redis::Commands;
 use sea_orm::{
     prelude::Expr, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, JoinType,
@@ -28,11 +29,21 @@ use std::env;
 use uuid::Uuid;
 
 pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Response {
-    if credentials.email.is_empty() || credentials.password.is_empty() {
-        return common_response(StatusCode::BAD_REQUEST, "Email and password are required");
+    if credentials.email.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Email are required");
+    }
+
+    if credentials.password.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Password are required");
+    }
+
+    if !EmailAddress::is_valid(&credentials.email) {
+        return common_response(StatusCode::BAD_REQUEST, "Email not valid");
     }
 
     let db = get_db().await;
+
+    let mut redis = connect_redis();
 
     let user_data = match UsersEntity::find()
         .select_only()
@@ -100,8 +111,15 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         );
     }
 
-    let access_token = encode_access_token(email.clone()).unwrap();
-    let refresh_token = encode_refresh_token(email.clone()).unwrap();
+    let access_token = match encode_access_token(&email) {
+        Ok(token) => token,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
+
+    let refresh_token = match encode_refresh_token(&email) {
+        Ok(token) => token,
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+    };
 
     let permissions = if let Some(role_id) = role_id {
         match RolesPermissionsEntity::find()
@@ -155,10 +173,56 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
         },
     };
 
-    success_response(response)
+    let redis_key = format!("authenticated_users_data:{}", credentials.email);
+
+    match redis.set_ex::<_, String, ()>(
+        &redis_key,
+        serde_json::to_string(&response.data.user).unwrap_or_default(),
+        86400,
+    ) {
+        Ok(_) => success_response(response),
+        Err(err) => common_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Redis storage failed: {}", err),
+        ),
+    }
 }
 
 pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Response {
+    if new_user.email.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Email are required");
+    }
+
+    if new_user.password.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Password are required");
+    }
+
+    if !EmailAddress::is_valid(&new_user.email) {
+        return common_response(StatusCode::BAD_REQUEST, "Email not valid");
+    }
+
+    if new_user.password.len() < 8 {
+        return common_response(
+            StatusCode::BAD_REQUEST,
+            "Password must be have 8 character long",
+        );
+    }
+
+    if new_user.fullname.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Fullname are required");
+    }
+
+    if new_user.phone_number.is_empty() {
+        return common_response(StatusCode::BAD_REQUEST, "Phone number are required");
+    }
+
+    if new_user.phone_number.len() < 10 {
+        return common_response(
+            StatusCode::BAD_REQUEST,
+            "Phone number at least have 10 character",
+        );
+    }
+
     let redis = connect_redis();
 
     let db: DatabaseConnection = get_db().await;
@@ -173,13 +237,6 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
         .await
     {
         return common_response(StatusCode::CONFLICT, "User with that email already exist");
-    }
-
-    if new_user.password.len() < 8 {
-        return common_response(
-            StatusCode::BAD_REQUEST,
-            "Password must be have 8 character long",
-        );
     }
 
     let hashed_password = hash_password(&new_user.password).unwrap();
@@ -245,7 +302,7 @@ pub async fn mutation_forgot_password(Json(payload): Json<AuthForgotRequestDto>)
     if let Ok(Some(user)) = user {
         let mut redis = connect_redis();
 
-        let reset_token = encode_access_token(user.email.clone()).unwrap();
+        let reset_token = encode_access_token(&user.email).unwrap();
 
         let redis_key = format!("reset_password:{}", user.email);
 
@@ -343,7 +400,7 @@ pub async fn mutation_new_password(Json(payload): Json<AuthNewPasswordRequestDto
         );
     }
 
-    let tok = decode_access_token(payload.token.clone());
+    let tok = decode_access_token(&payload.token);
 
     let email = tok.unwrap().claims.email;
     let key = format!("reset_password:{}", email);
@@ -385,33 +442,21 @@ pub async fn mutation_refresh(Json(payload): Json<AuthRefreshTokenRequestDto>) -
         return common_response(StatusCode::BAD_REQUEST, "Refresh token is required");
     }
 
-    let token_data = match decode_refresh_token(payload.refresh_token.clone()) {
+    let token_data = match decode_refresh_token(&payload.refresh_token) {
         Ok(data) => data,
-        Err(_) => {
-            return common_response(StatusCode::UNAUTHORIZED, "Invalid or expired refresh token")
-        }
+        Err(err) => return common_response(StatusCode::UNAUTHORIZED, &err.to_string()),
     };
 
     let email = token_data.claims.email;
 
-    let new_access_token = match encode_access_token(email.clone()) {
+    let new_access_token = match encode_access_token(&email) {
         Ok(token) => token,
-        Err(_) => {
-            return common_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to generate access token",
-            )
-        }
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     };
 
-    let new_refresh_token = match encode_refresh_token(email.clone()) {
+    let new_refresh_token = match encode_refresh_token(&email) {
         Ok(token) => token,
-        Err(_) => {
-            return common_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to generate refresh token",
-            )
-        }
+        Err(err) => return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
     };
 
     let auth_response = ResponseSuccessDto {
