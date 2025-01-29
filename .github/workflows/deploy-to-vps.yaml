@@ -41,8 +41,6 @@ jobs:
 
           sudo cp /var/www/najm-course-api/target/release/najm-course-api /opt/najm-course-api/najm-course-api
 
-          sudo chown deploy:deploy /opt/najm-course-api/najm-course-api
-
           sudo chmod +x /opt/najm-course-api/najm-course-api
 
           sudo systemctl daemon-reload
