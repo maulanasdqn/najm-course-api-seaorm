@@ -220,17 +220,40 @@ pub async fn mutation_update_role(id: String, payload: Json<RolesRequestUpdateDt
             }
         };
 
-        for permission_id in permission_ids {
-            let parsed_permission_id = match Uuid::parse_str(permission_id) {
-                Ok(id) => id,
-                Err(_) => continue,
-            };
+        let new_permission_ids: Vec<Uuid> = permission_ids
+            .iter()
+            .filter_map(|p| Uuid::parse_str(p).ok())
+            .collect();
 
-            if !existing_permissions.contains(&parsed_permission_id) {
+        let permissions_to_remove: Vec<Uuid> = existing_permissions
+            .iter()
+            .filter(|perm| !new_permission_ids.contains(perm))
+            .cloned()
+            .collect();
+
+        if !permissions_to_remove.is_empty() {
+            if let Err(err) = RolesPermissionsEntity::delete_many()
+                .filter(
+                    RolesPermissionsColumn::RoleId
+                        .eq(updated_role.id)
+                        .and(RolesPermissionsColumn::PermissionId.is_in(permissions_to_remove)),
+                )
+                .exec(&db)
+                .await
+            {
+                return common_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Failed to remove old permissions: {}", err),
+                );
+            }
+        }
+
+        for permission_id in &new_permission_ids {
+            if !existing_permissions.contains(permission_id) {
                 let role_permission = RolesPermissionsActiveModel {
                     id: Set(Uuid::new_v4()),
                     role_id: Set(updated_role.id),
-                    permission_id: Set(parsed_permission_id),
+                    permission_id: Set(*permission_id),
                 };
 
                 if let Err(err) = role_permission.insert(&db).await {
