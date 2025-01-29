@@ -19,24 +19,6 @@ jobs:
         toolchain: stable
         override: true
 
-    - name: Install dependencies and build
-      run: |
-        cargo build --release
-        ls -la target/release
-        file target/release/najm-course-api
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: release-artifact
-        path: target/release/najm-course-api
-
-    - name: Download artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: release-artifact
-        path: .
-
     - name: Deploy to server
       uses: appleboy/ssh-action@v0.1.7
       with:
@@ -49,15 +31,18 @@ jobs:
 
           echo "Deploying to server"
 
-          mv najm-course-api /home/deploy/temp-build/najm-course-api
+          cd /var/www/najm-course-api
 
-          sudo systemctl stop najm-course-api || true
+          git pull origin main
 
-          sudo mkdir -p /opt/najm-course-api
+          sudo cargo build --release
 
-          sudo mv /home/deploy/temp-build/najm-course-api /opt/najm-course-api/najm-course-api
+          sudo systemctl stop najm-course-api
+
+          sudo cp /var/www/najm-course-api/target/release/najm-course-api /opt/najm-course-api/najm-course-api
 
           sudo chown deploy:deploy /opt/najm-course-api/najm-course-api
+
           sudo chmod +x /opt/najm-course-api/najm-course-api
 
           sudo systemctl daemon-reload
