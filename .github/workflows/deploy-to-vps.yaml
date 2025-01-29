@@ -22,12 +22,20 @@ jobs:
     - name: Install dependencies and build
       run: |
         cargo build --release
+        ls -la target/release
+        file target/release/najm-course-api
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: release-artifact
         path: target/release/najm-course-api
+
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: release-artifact
+        path: .
 
     - name: Deploy to server
       uses: appleboy/ssh-action@v0.1.7
@@ -39,14 +47,22 @@ jobs:
         script: |
           set -e
 
-          echo "Deploying Rust app to server"
+          echo "Deploying to server"
 
-          mv target/release/najm-course-api /home/deploy/temp-build
+          mv najm-course-api /home/deploy/temp-build/najm-course-api
 
           sudo systemctl stop najm-course-api || true
 
-          sudo mv /home/deploy/temp-build /opt/najm-course-api/najm-course-api
-          sudo chown -R deploy:deploy /home/deploy/najm-course-api
+          sudo mkdir -p /opt/najm-course-api
+
+          sudo mv /home/deploy/temp-build/najm-course-api /opt/najm-course-api/najm-course-api
+
+          sudo chown deploy:deploy /opt/najm-course-api/najm-course-api
+          sudo chmod +x /opt/najm-course-api/najm-course-api
 
           sudo systemctl daemon-reload
+
           sudo systemctl restart najm-course-api
+
+          echo "Deployment completed successfully"
+
