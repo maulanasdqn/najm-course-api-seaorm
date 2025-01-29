@@ -1,33 +1,17 @@
 use axum::{
     body::Body,
     extract::Request,
-    http::{
-        header::{AUTHORIZATION, CONTENT_TYPE},
-        Response, StatusCode,
-    },
+    http::{header::AUTHORIZATION, Response, StatusCode},
     middleware::Next,
 };
 use sea_orm::QueryFilter;
 use sea_orm::{ColumnTrait, EntityTrait};
-use serde_json::json;
 use std::convert::Infallible;
 
 use crate::{
-    decode_access_token, get_db,
+    common_response, decode_access_token, get_db,
     schemas::{UsersColumn, UsersEntity},
 };
-
-pub fn format_error(message: String) -> Response<Body> {
-    let error_body = json!({
-        "message": message
-    });
-
-    Response::builder()
-        .status(StatusCode::FORBIDDEN)
-        .header(CONTENT_TYPE, "application/json")
-        .body(Body::from(error_body.to_string()))
-        .unwrap()
-}
 
 pub async fn authorization_middleware(
     mut req: Request<Body>,
@@ -40,14 +24,17 @@ pub async fn authorization_middleware(
     let auth_header = match auth_header {
         Some(header) => header.to_str(),
         None => {
-            return Ok(format_error("You are not authorized".to_string()));
+            return Ok(common_response(
+                StatusCode::UNAUTHORIZED,
+                "You are not authorized",
+            ));
         }
     };
 
     let auth_header = match auth_header {
         Ok(header) => header.to_string(),
         Err(_) => {
-            return Ok(format_error("Invalid header".to_string()));
+            return Ok(common_response(StatusCode::UNAUTHORIZED, "Invalid header"));
         }
     };
 
@@ -56,14 +43,17 @@ pub async fn authorization_middleware(
     let token = match header_parts.nth(1) {
         Some(token) => token,
         None => {
-            return Ok(format_error("Invalid token".to_string()));
+            return Ok(common_response(StatusCode::UNAUTHORIZED, "Invalid token"));
         }
     };
 
     let token_data = match decode_access_token(token.to_string()) {
         Ok(data) => data,
         Err(_) => {
-            return Ok(format_error("Invalid token".to_string()));
+            return Ok(common_response(
+                StatusCode::UNAUTHORIZED,
+                "Invalid token or expired",
+            ));
         }
     };
 
@@ -78,7 +68,13 @@ pub async fn authorization_middleware(
             let response = next.run(req).await;
             Ok(response)
         }
-        Ok(None) => Ok(format_error("Unauthorized user".to_string())),
-        Err(err) => Ok(format_error(err.to_string())),
+        Ok(None) => Ok(common_response(
+            StatusCode::UNAUTHORIZED,
+            "Unauthorized user",
+        )),
+        Err(err) => Ok(common_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &err.to_string(),
+        )),
     }
 }
