@@ -31,6 +31,8 @@ jobs:
 
           echo "Deploying to server"
 
+          git config --global --add safe.directory /var/www/najm-course-api
+
           cd /var/www/najm-course-api
 
           git pull origin main
