@@ -41,12 +41,11 @@ jobs:
 
           echo "Deploying Rust app to server"
 
+          mv target/release/najm-course-api /home/deploy/temp-build
+
           sudo systemctl stop najm-course-api || true
 
-          mkdir -p /home/deploy/najm-course-api/
-          mv ~/najm-course-api /home/deploy/najm-course-api/najm-course-api
-          chmod +x /home/deploy/najm-course-api/najm-course-api
-
+          sudo mv /home/deploy/temp-build /opt/najm-course-api/najm-course-api
           sudo chown -R deploy:deploy /home/deploy/najm-course-api
 
           sudo systemctl daemon-reload
