@@ -1,51 +1,53 @@
-name: Deploy to VPS
+name: Deploy To VPS
 
 on:
   push:
     branches:
-      - main
+      - main  
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VPS_IP }} >> ~/.ssh/known_hosts
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
 
-      - name: Deploy Application
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_IP }} << 'EOF'
-            set -e
-            echo "Pulling latest changes..."
-            cd /root/najm-course-api
-            git pull origin main
+    - name: Install dependencies and build
+      run: |
+        cargo build --release
 
-            echo "Apply .env"
-            export $(cat /etc/.env/najm-course-api/.env | xargs)
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: release-artifact
+        path: target/release/najm-course-api
 
-            echo "Apply Migrations..."
-            sea-orm-cli migrate up
-            
-            echo "Building the application..."
-            cargo build --release
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.VPS_IP }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT }}
+        script: |
+          set -e
 
-            echo "Stoping the service..."
-            sudo systemctl stop najm-course-api.service
+          echo "Deploying Rust app to server"
 
-            echo "Replacing the service binary..."
-            sudo cp target/release/najm-course-api /usr/local/bin/najm-course-api
-            sudo chmod +x /usr/local/bin/najm-course-api
+          sudo systemctl stop najm-course-api || true
 
-            echo "Restarting the service..."
-            sudo systemctl restart najm-course-api.service
-            
-            echo "Deployment complete!"
-          EOF
+          mkdir -p /home/deploy/najm-course-api/
+          mv ~/najm-course-api /home/deploy/najm-course-api/najm-course-api
+          chmod +x /home/deploy/najm-course-api/najm-course-api
+
+          sudo chown -R deploy:deploy /home/deploy/najm-course-api
+
+          sudo systemctl daemon-reload
+          sudo systemctl restart najm-course-api
