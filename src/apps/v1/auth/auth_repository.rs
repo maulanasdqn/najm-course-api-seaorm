@@ -190,71 +190,100 @@ pub async fn mutation_login(Json(credentials): Json<AuthLoginRequestDto>) -> Res
 
 pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Response {
     if new_user.email.is_empty() {
-        return common_response(StatusCode::BAD_REQUEST, "Email are required");
+        return common_response(StatusCode::BAD_REQUEST, "Email is required");
     }
 
     if new_user.password.is_empty() {
-        return common_response(StatusCode::BAD_REQUEST, "Password are required");
+        return common_response(StatusCode::BAD_REQUEST, "Password is required");
     }
 
     if !EmailAddress::is_valid(&new_user.email) {
-        return common_response(StatusCode::BAD_REQUEST, "Email not valid");
+        return common_response(StatusCode::BAD_REQUEST, "Email is not valid");
     }
 
     if new_user.password.len() < 8 {
         return common_response(
             StatusCode::BAD_REQUEST,
-            "Password must be have 8 character long",
+            "Password must be at least 8 characters long",
         );
     }
 
     if new_user.fullname.is_empty() {
-        return common_response(StatusCode::BAD_REQUEST, "Fullname are required");
+        return common_response(StatusCode::BAD_REQUEST, "Fullname is required");
     }
 
     if new_user.phone_number.is_empty() {
-        return common_response(StatusCode::BAD_REQUEST, "Phone number are required");
+        return common_response(StatusCode::BAD_REQUEST, "Phone number is required");
     }
 
     if new_user.phone_number.len() < 10 {
         return common_response(
             StatusCode::BAD_REQUEST,
-            "Phone number at least have 10 character",
+            "Phone number must be at least 10 characters",
         );
     }
 
-    let redis = connect_redis();
-
     let db: DatabaseConnection = get_db().await;
 
-    let otp_manager = OtpManager::new(300);
+    println!("Searching for user with email: {}", new_user.email);
 
-    if let Ok(Some(_)) = UsersEntity::find()
+    let check_email = UsersEntity::find()
         .select_only()
         .column(UsersColumn::Email)
         .filter(UsersColumn::Email.eq(new_user.email.clone()))
+        .into_tuple::<String>()
         .one(&db)
-        .await
-    {
-        return common_response(StatusCode::CONFLICT, "User with that email already exist");
+        .await;
+
+    match check_email {
+        Ok(Some(_)) => {
+            return common_response(StatusCode::CONFLICT, "User with that email already exists");
+        }
+        Ok(None) => {
+            println!("No user found with the given email.");
+        }
+        Err(err) => {
+            println!("Query error: {:?}", err);
+            return common_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "An error occurred while checking user existence",
+            );
+        }
     }
 
-    let hashed_password = hash_password(&new_user.password).unwrap();
+    let hashed_password = match hash_password(&new_user.password) {
+        Ok(password) => password,
+        Err(_) => {
+            return common_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error occurred while hashing the password",
+            );
+        }
+    };
 
+    let redis = connect_redis();
+    let otp_manager = OtpManager::new(300);
     let otp = otp_manager.generate_otp(redis, &new_user.email);
 
-    let student_role = RolesEntity::find()
+    let student_role = match RolesEntity::find()
         .select_only()
         .column(RolesColumn::Id)
         .column(RolesColumn::Name)
         .filter(RolesColumn::Name.eq(RolesEnum::Student.to_string()))
         .one(&db)
         .await
-        .unwrap();
+    {
+        Ok(Some(role)) => role,
+        Ok(None) => return common_response(StatusCode::BAD_REQUEST, "Student role not found"),
+        Err(err) => {
+            println!("Role query error: {:?}", err);
+            return common_response(StatusCode::INTERNAL_SERVER_ERROR, "Error fetching roles");
+        }
+    };
 
     let active_model = UsersActiveModel {
         id: Set(Uuid::new_v4()),
-        role_id: Set(student_role.unwrap().id),
+        role_id: Set(student_role.id),
         fullname: Set(new_user.fullname.clone()),
         email: Set(new_user.email.clone()),
         email_verified: Set(None),
@@ -277,55 +306,91 @@ pub async fn mutation_register(new_user: Json<AuthRegisterRequestDto>) -> Respon
 
     let email_content = &format!("Your OTP Code is {}", otp);
 
-    send_email(&new_user.email, "Verification", email_content).unwrap();
+    if let Err(err) = send_email(&new_user.email, "Verification", email_content) {
+        println!("Email sending error: {:?}", err);
+        return common_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Failed to send verification email",
+        );
+    }
 
     match active_model.insert(&db).await {
         Ok(_) => common_response(StatusCode::CREATED, "User created successfully"),
-        Err(err) => common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string()),
+        Err(err) => {
+            println!("Insert error: {:?}", err);
+            common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
+        }
     }
 }
 
 pub async fn mutation_forgot_password(Json(payload): Json<AuthForgotRequestDto>) -> Response {
     let db: DatabaseConnection = get_db().await;
 
+    println!("Received email: {}", payload.email);
+
     if payload.email.is_empty() {
         return common_response(StatusCode::BAD_REQUEST, "Email is required");
     }
 
-    let user = UsersEntity::find()
+    let email_lower = payload.email.to_lowercase();
+
+    let user_result = UsersEntity::find()
         .select_only()
         .column(UsersColumn::Email)
-        .filter(UsersColumn::Email.eq(payload.email.clone()))
+        .filter(Expr::col(UsersColumn::Email).eq(email_lower.clone()))
+        .into_tuple::<String>()
         .one(&db)
         .await;
 
-    if let Ok(Some(user)) = user {
-        let mut redis = connect_redis();
+    match user_result {
+        Ok(Some(user_email)) => {
+            println!("User found with email: {}", user_email);
 
-        let reset_token = encode_access_token(&user.email).unwrap();
+            let mut redis = connect_redis();
+            let reset_token = match encode_access_token(&user_email) {
+                Ok(token) => token,
+                Err(err) => {
+                    println!("Error generating reset token: {:?}", err);
+                    return common_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to generate reset token",
+                    );
+                }
+            };
 
-        let redis_key = format!("reset_password:{}", user.email);
+            let redis_key = format!("reset_password:{}", user_email);
 
-        if let Err(err) = redis.set_ex::<_, _, ()>(
-            &redis_key,
-            reset_token.clone(),
-            (3600 * 24).try_into().unwrap_or(86400),
-        ) {
-            return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+            if let Err(err) = redis.set_ex::<_, _, ()>(
+                &redis_key,
+                reset_token.clone(),
+                (3600 * 24).try_into().unwrap_or(86400),
+            ) {
+                println!("Redis error: {:?}", err);
+                return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+            }
+
+            let fe_url = env::var("FE_URL").unwrap_or_else(|_| "".to_string());
+            let email_content = format!(
+                "You have requested a password reset. Please click the link below to continue: {}/auth/reset-password?token={}",
+                fe_url, reset_token
+            );
+
+            if let Err(err) = send_email(&user_email, "Reset Password Request", &email_content) {
+                println!("Email sending error: {:?}", err);
+                return common_response(StatusCode::INTERNAL_SERVER_ERROR, "Failed to send email");
+            }
+
+            return common_response(StatusCode::OK, "Password reset token sent");
         }
-
-        let fe_url = env::var("FE_URL").unwrap_or("".to_string());
-        let email_content = format!(
-            "You have requested a password reset. Please click the link below to continue: {}/auth/reset-password?token={}",
-            fe_url, reset_token
-        );
-
-        send_email(&user.email, "Reset Password Request", &email_content).unwrap();
-
-        return common_response(StatusCode::OK, "Password reset token sent");
+        Ok(None) => {
+            println!("No user found with email: {}", email_lower);
+            common_response(StatusCode::NOT_FOUND, "User not found")
+        }
+        Err(err) => {
+            println!("Database query error: {:?}", err);
+            common_response(StatusCode::INTERNAL_SERVER_ERROR, "Database error")
+        }
     }
-
-    common_response(StatusCode::NOT_FOUND, "User not found")
 }
 
 pub async fn mutation_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> Response {

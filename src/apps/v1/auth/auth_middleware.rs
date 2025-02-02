@@ -4,8 +4,8 @@ use axum::{
     http::{header::AUTHORIZATION, Response, StatusCode},
     middleware::Next,
 };
-use sea_orm::QueryFilter;
 use sea_orm::{ColumnTrait, EntityTrait};
+use sea_orm::{QueryFilter, QuerySelect};
 use std::convert::Infallible;
 
 use crate::{
@@ -58,7 +58,10 @@ pub async fn authorization_middleware(
     };
 
     let user = UsersEntity::find()
+        .select_only()
+        .column(UsersColumn::Email)
         .filter(UsersColumn::Email.eq(token_data.claims.email.clone()))
+        .into_tuple::<String>()
         .one(&db)
         .await;
 
