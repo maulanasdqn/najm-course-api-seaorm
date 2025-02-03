@@ -37,8 +37,6 @@ jobs:
 
           git pull origin main
 
-          sudo sea-orm-cli migrate up
-
           sudo cargo build --release
 
           sudo systemctl stop najm-course-api
