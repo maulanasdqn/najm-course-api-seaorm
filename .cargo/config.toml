@@ -1,0 +1,2 @@
+[env]
+RUST_LOG="najm-course-api=debug"

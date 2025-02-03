@@ -6,8 +6,20 @@ result
 .env
 .env.local
 .env.prod
+.env.develop
+.env.dev
+.env.stag
+.env.production
+.env.development
+.env.staging
 .envrc
 
 # Nix
 Cargo.nix
 .direnv
+
+# jetbrain
+.idea
+
+# vscode
+.vscode
