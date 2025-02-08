@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 argon2 = { version = "0.5.3", features = ["password-hash"] }
-axum = "0.8.1"
+axum = { version = "0.8.1", features = ["multipart"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 jsonwebtoken = "9.3.0"
 log = "0.4.25"
@@ -28,6 +28,9 @@ redis = "0.28.1"
 thiserror = "2.0.11"
 hyper = "1.5.2"
 email_address = "0.2.9"
+minio-rsc = { version = "0.2.3", features = ["ext", "fs-tokio"] }
+bytes = { version = "1.10.0", features = ["serde"] }
+mime_guess = "2.0.5"
 
 [profile.release]
 lto = "fat"

@@ -52,7 +52,8 @@ pub async fn root_routes() -> Router {
             v1::permissions::permissions_controller::get_detail_permission,
             v1::permissions::permissions_controller::post_create_permission,
             v1::permissions::permissions_controller::put_update_permission,
-            v1::permissions::permissions_controller::delete_permission
+            v1::permissions::permissions_controller::delete_permission,
+            v1::storage::storage_controller::post_upload,
         ),
         components(
             schemas(
@@ -67,6 +68,8 @@ pub async fn root_routes() -> Router {
                 ResponseSuccessDto<RolesItemDto>,
                 ResponseSuccessListDto<PermissionsItemDto>,
                 ResponseSuccessDto<PermissionsItemDto>,
+                v1::storage::storage_dto::StorageRequestDto,
+                v1::storage::storage_dto::StorageResponseDto,
                 v1::auth::auth_dto::AuthLoginRequestDto,
                 v1::auth::auth_dto::AuthRegisterRequestDto,
                 v1::auth::auth_dto::AuthTokenItemDto,
@@ -149,6 +152,7 @@ pub async fn root_routes() -> Router {
 		.nest("/users", v1::users::users_router())
 		.nest("/roles", v1::roles::roles_router())
 		.nest("/permissions", v1::permissions::permissions_router())
+		.nest("/storage", v1::storage::storage_router().await)
 		.layer(from_fn(v1::auth::auth_middleware::authorization_middleware));
 
 	let v1_routes = Router::new()

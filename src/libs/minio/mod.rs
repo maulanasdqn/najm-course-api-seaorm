@@ -1,0 +1,125 @@
+use bytes::Bytes;
+use log::{error, info};
+use mime_guess::from_path;
+use minio_rsc::client::Minio;
+use minio_rsc::error::Error;
+use minio_rsc::provider::StaticProvider;
+use std::env;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use uuid::Uuid;
+
+#[derive(Clone)]
+pub struct MinioClient {
+	client: Arc<Minio>,
+	bucket_name: String,
+}
+
+#[derive(Clone)]
+pub struct AppState {
+	pub minio: Arc<Mutex<MinioClient>>,
+}
+
+const ALLOWED_IMAGE_EXTENSIONS: &[&str] =
+	&["jpg", "jpeg", "png", "gif", "bmp", "webp"];
+const ALLOWED_IMAGE_MIME_TYPES: &[&str] = &[
+	"image/jpeg",
+	"image/png",
+	"image/gif",
+	"image/bmp",
+	"image/webp",
+];
+
+impl MinioClient {
+	pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+		let bucket_name = env::var("MINIO_BUCKET_NAME").map_err(|e| {
+			error!("MINIO_BUCKET_NAME is not set: {}", e);
+			e
+		})?;
+		let endpoint = env::var("MINIO_ENDPOINT").map_err(|e| {
+			error!("MINIO_ENDPOINT is not set: {}", e);
+			e
+		})?;
+		let access_key = env::var("MINIO_ACCESS_KEY").map_err(|e| {
+			error!("MINIO_ACCESS_KEY is not set: {}", e);
+			e
+		})?;
+		let secret_key = env::var("MINIO_SECRET_KEY").map_err(|e| {
+			error!("MINIO_SECRET_KEY is not set: {}", e);
+			e
+		})?;
+
+		let provider = StaticProvider::new(&access_key, &secret_key, None);
+
+		let client = Minio::builder()
+			.endpoint(&endpoint)
+			.provider(provider)
+			.secure(true)
+			.build()?;
+
+		if !client.bucket_exists(&bucket_name).await? {
+			client.make_bucket(&bucket_name, false).await?;
+			info!("Bucket `{}` created successfully.", bucket_name);
+		}
+
+		Ok(Self {
+			client: Arc::new(client),
+			bucket_name,
+		})
+	}
+
+	pub async fn upload_file(
+		&self,
+		original_filename: &str,
+		data: Vec<u8>,
+	) -> Result<String, Error> {
+		let sanitized_filename = original_filename
+			.chars()
+			.filter(|c| c.is_alphanumeric() || *c == '.' || *c == '_' || *c == '-')
+			.collect::<String>();
+
+		let file_ext = std::path::Path::new(&sanitized_filename)
+			.extension()
+			.and_then(|ext| ext.to_str())
+			.unwrap_or("");
+
+		if !ALLOWED_IMAGE_EXTENSIONS.contains(&file_ext.to_lowercase().as_str()) {
+			error!("Invalid file extension: {}", file_ext);
+			return Err(Error::from("Unsupported file extension"));
+		}
+
+		let mime_guess = from_path(&sanitized_filename).first_or_octet_stream();
+		let mime_type = mime_guess.essence_str();
+
+		if !ALLOWED_IMAGE_MIME_TYPES.contains(&mime_type) {
+			error!("Invalid MIME type: {}", mime_type);
+			return Err(Error::from("Unsupported file type"));
+		}
+
+		let unique_filename = format!(
+			"{}-{}.{}",
+			Uuid::new_v4(),
+			sanitized_filename.replace('.', "_"),
+			file_ext
+		);
+
+		info!(
+			"Uploading file: {} ({} KB)",
+			unique_filename,
+			data.len() / 1024
+		);
+
+		let endpoint =
+			env::var("MINIO_ENDPOINT").expect("MINIO_ENDPOINT must be set");
+
+		self.client
+			.put_object(&self.bucket_name, &unique_filename, Bytes::from(data))
+			.await?;
+
+		let file_url = format!(
+			"https://{}/{}/{}",
+			endpoint, self.bucket_name, unique_filename
+		);
+		Ok(file_url)
+	}
+}
