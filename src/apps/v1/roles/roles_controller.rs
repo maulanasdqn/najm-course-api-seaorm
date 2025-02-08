@@ -1,21 +1,23 @@
 use axum::{
-    extract::{Path, Query},
-    http::HeaderMap,
-    response::IntoResponse,
-    Json,
+	extract::{Path, Query},
+	http::HeaderMap,
+	response::IntoResponse,
+	Json,
 };
 
 use crate::{
-    permissions::{permissions_middleware, PermissionsEnum},
-    utils::dto::{MessageResponseDto, MetaRequestDto},
-    ResponseSuccessDto, ResponseSuccessListDto,
+	permissions::{permissions_middleware, PermissionsEnum},
+	utils::dto::{MessageResponseDto, MetaRequestDto},
+	ResponseSuccessDto, ResponseSuccessListDto,
 };
 
 use super::{
-    mutation_delete_role, mutation_update_role,
-    roles_dto::RolesRequestUpdateDto,
-    roles_repository::{mutation_create_role, query_get_role_by_id, query_get_roles},
-    RolesItemDto, RolesItemListDto, RolesRequestCreateDto,
+	mutation_delete_role, mutation_update_role,
+	roles_dto::RolesRequestUpdateDto,
+	roles_repository::{
+		mutation_create_role, query_get_role_by_id, query_get_roles,
+	},
+	RolesItemDto, RolesItemListDto, RolesRequestCreateDto,
 };
 
 #[utoipa::path(
@@ -32,13 +34,15 @@ use super::{
     tag = "Roles"
 )]
 pub async fn get_roles(
-    headers: HeaderMap,
-    Query(params): Query<MetaRequestDto>,
+	headers: HeaderMap,
+	Query(params): Query<MetaRequestDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(&headers, vec![PermissionsEnum::ReadListRoles]).await {
-        Ok(_) => query_get_roles(params).await,
-        Err(response) => response,
-    }
+	match permissions_middleware(&headers, vec![PermissionsEnum::ReadListRoles])
+		.await
+	{
+		Ok(_) => query_get_roles(params).await,
+		Err(response) => response,
+	}
 }
 
 #[utoipa::path(
@@ -53,11 +57,16 @@ pub async fn get_roles(
     ),
     tag = "Roles"
 )]
-pub async fn get_detail_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(&headers, vec![PermissionsEnum::ReadDetailRoles]).await {
-        Ok(_) => query_get_role_by_id(id).await,
-        Err(response) => response,
-    }
+pub async fn get_detail_role(
+	headers: HeaderMap,
+	Path(id): Path<String>,
+) -> impl IntoResponse {
+	match permissions_middleware(&headers, vec![PermissionsEnum::ReadDetailRoles])
+		.await
+	{
+		Ok(_) => query_get_role_by_id(id).await,
+		Err(response) => response,
+	}
 }
 
 #[utoipa::path(
@@ -74,13 +83,14 @@ pub async fn get_detail_role(headers: HeaderMap, Path(id): Path<String>) -> impl
     tag = "Roles"
 )]
 pub async fn post_create_role(
-    headers: HeaderMap,
-    Json(payload): Json<RolesRequestCreateDto>,
+	headers: HeaderMap,
+	Json(payload): Json<RolesRequestCreateDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(&headers, vec![PermissionsEnum::CreateRoles]).await {
-        Ok(_) => mutation_create_role(Json(payload)).await,
-        Err(response) => response,
-    }
+	match permissions_middleware(&headers, vec![PermissionsEnum::CreateRoles]).await
+	{
+		Ok(_) => mutation_create_role(Json(payload)).await,
+		Err(response) => response,
+	}
 }
 
 #[utoipa::path(
@@ -95,11 +105,15 @@ pub async fn post_create_role(
     ),
     tag = "Roles"
 )]
-pub async fn delete_role(headers: HeaderMap, Path(id): Path<String>) -> impl IntoResponse {
-    match permissions_middleware(&headers, vec![PermissionsEnum::DeleteRoles]).await {
-        Ok(_) => mutation_delete_role(id).await,
-        Err(response) => response,
-    }
+pub async fn delete_role(
+	headers: HeaderMap,
+	Path(id): Path<String>,
+) -> impl IntoResponse {
+	match permissions_middleware(&headers, vec![PermissionsEnum::DeleteRoles]).await
+	{
+		Ok(_) => mutation_delete_role(id).await,
+		Err(response) => response,
+	}
 }
 
 #[utoipa::path(
@@ -116,12 +130,13 @@ pub async fn delete_role(headers: HeaderMap, Path(id): Path<String>) -> impl Int
     tag = "Roles"
 )]
 pub async fn put_update_role(
-    headers: HeaderMap,
-    Path(id): Path<String>,
-    Json(payload): Json<RolesRequestUpdateDto>,
+	headers: HeaderMap,
+	Path(id): Path<String>,
+	Json(payload): Json<RolesRequestUpdateDto>,
 ) -> impl IntoResponse {
-    match permissions_middleware(&headers, vec![PermissionsEnum::UpdateRoles]).await {
-        Ok(_) => mutation_update_role(id, Json(payload)).await,
-        Err(response) => response,
-    }
+	match permissions_middleware(&headers, vec![PermissionsEnum::UpdateRoles]).await
+	{
+		Ok(_) => mutation_update_role(id, Json(payload)).await,
+		Err(response) => response,
+	}
 }

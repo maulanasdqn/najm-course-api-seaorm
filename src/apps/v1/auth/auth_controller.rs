@@ -1,10 +1,11 @@
 use crate::{MessageResponseDto, ResponseSuccessDto};
 
 use super::{
-    mutation_forgot_password, mutation_login, mutation_new_password, mutation_refresh,
-    mutation_register, mutation_send_otp, mutation_verify_email, AuthDataDto, AuthForgotRequestDto,
-    AuthLoginRequestDto, AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
-    AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
+	mutation_forgot_password, mutation_login, mutation_new_password,
+	mutation_refresh, mutation_register, mutation_send_otp, mutation_verify_email,
+	AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto,
+	AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto, AuthRegisterRequestDto,
+	AuthTokenItemDto, AuthVerifyEmailRequestDto,
 };
 
 use axum::{extract::Json, response::IntoResponse};
@@ -20,8 +21,10 @@ use axum::{extract::Json, response::IntoResponse};
     tag = "Authentication"
 )]
 
-pub async fn post_login(Json(payload): Json<AuthLoginRequestDto>) -> impl IntoResponse {
-    mutation_login(Json(payload)).await
+pub async fn post_login(
+	Json(payload): Json<AuthLoginRequestDto>,
+) -> impl IntoResponse {
+	mutation_login(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -35,8 +38,10 @@ pub async fn post_login(Json(payload): Json<AuthLoginRequestDto>) -> impl IntoRe
     tag = "Authentication"
 )]
 
-pub async fn post_register(Json(payload): Json<AuthRegisterRequestDto>) -> impl IntoResponse {
-    mutation_register(Json(payload)).await
+pub async fn post_register(
+	Json(payload): Json<AuthRegisterRequestDto>,
+) -> impl IntoResponse {
+	mutation_register(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -50,8 +55,10 @@ pub async fn post_register(Json(payload): Json<AuthRegisterRequestDto>) -> impl 
     tag = "Authentication"
 )]
 
-pub async fn post_forgot(Json(payload): Json<AuthForgotRequestDto>) -> impl IntoResponse {
-    mutation_forgot_password(Json(payload)).await
+pub async fn post_forgot(
+	Json(payload): Json<AuthForgotRequestDto>,
+) -> impl IntoResponse {
+	mutation_forgot_password(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -65,8 +72,10 @@ pub async fn post_forgot(Json(payload): Json<AuthForgotRequestDto>) -> impl Into
     tag = "Authentication"
 )]
 
-pub async fn post_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> impl IntoResponse {
-    mutation_send_otp(Json(payload)).await
+pub async fn post_send_otp(
+	Json(payload): Json<AuthForgotRequestDto>,
+) -> impl IntoResponse {
+	mutation_send_otp(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -81,9 +90,9 @@ pub async fn post_send_otp(Json(payload): Json<AuthForgotRequestDto>) -> impl In
 )]
 
 pub async fn post_new_password(
-    Json(payload): Json<AuthNewPasswordRequestDto>,
+	Json(payload): Json<AuthNewPasswordRequestDto>,
 ) -> impl IntoResponse {
-    mutation_new_password(Json(payload)).await
+	mutation_new_password(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -98,9 +107,9 @@ pub async fn post_new_password(
 )]
 
 pub async fn post_verify_email(
-    Json(payload): Json<AuthVerifyEmailRequestDto>,
+	Json(payload): Json<AuthVerifyEmailRequestDto>,
 ) -> impl IntoResponse {
-    mutation_verify_email(Json(payload)).await
+	mutation_verify_email(Json(payload)).await
 }
 
 #[utoipa::path(
@@ -114,6 +123,8 @@ pub async fn post_verify_email(
     tag = "Authentication"
 )]
 
-pub async fn post_refresh(Json(payload): Json<AuthRefreshTokenRequestDto>) -> impl IntoResponse {
-    mutation_refresh(Json(payload)).await
+pub async fn post_refresh(
+	Json(payload): Json<AuthRefreshTokenRequestDto>,
+) -> impl IntoResponse {
+	mutation_refresh(Json(payload)).await
 }
