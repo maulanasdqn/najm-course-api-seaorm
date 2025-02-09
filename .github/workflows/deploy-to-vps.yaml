@@ -60,8 +60,6 @@ jobs:
 
           echo "Restarting the service"
 
-          sudo chmod +x /opt/najm-course-api/najm-course-api
-
           sudo systemctl daemon-reload
 
           sudo systemctl restart najm-course-api
