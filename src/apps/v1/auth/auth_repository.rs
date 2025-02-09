@@ -54,6 +54,7 @@ pub async fn mutation_login(
 		.column(UsersColumn::Email)
 		.column(UsersColumn::Password)
 		.column(UsersColumn::IsActive)
+		.column(UsersColumn::IsProfileCompleted)
 		.column(UsersColumn::Fullname)
 		.column(UsersColumn::Avatar)
 		.column(UsersColumn::PhoneNumber)
@@ -65,6 +66,7 @@ pub async fn mutation_login(
 			Uuid,
 			String,
 			String,
+			bool,
 			bool,
 			String,
 			Option<String>,
@@ -80,6 +82,7 @@ pub async fn mutation_login(
 			email,
 			hashed_password,
 			is_active,
+			is_profile_completed,
 			fullname,
 			avatar,
 			phone_number,
@@ -90,6 +93,7 @@ pub async fn mutation_login(
 			email,
 			hashed_password,
 			is_active,
+			is_profile_completed,
 			fullname,
 			avatar,
 			phone_number,
@@ -115,6 +119,7 @@ pub async fn mutation_login(
 		email,
 		hashed_password,
 		is_active,
+		is_profile_completed,
 		fullname,
 		avatar,
 		phone_number,
@@ -202,6 +207,7 @@ pub async fn mutation_login(
 				email,
 				fullname,
 				avatar,
+				is_profile_completed,
 				phone_number,
 				role: role_dto,
 			},

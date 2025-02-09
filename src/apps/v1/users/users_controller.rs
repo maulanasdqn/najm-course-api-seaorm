@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
 	mutation_delete_user, mutation_set_active_inactive_user, mutation_update_user,
-	query_get_user_me,
+	mutation_update_user_me, query_get_user_me,
 	users_dto::{UsersCreateRequestDto, UsersUpdateRequestDto},
 	users_repository::{
 		mutation_create_users, query_get_user_by_id, query_get_users,
@@ -153,6 +153,29 @@ pub async fn put_update_user(
 	match permissions_middleware(&headers, vec![PermissionsEnum::UpdateUsers]).await
 	{
 		Ok(_) => mutation_update_user(id, Json(payload)).await,
+		Err(response) => response,
+	}
+}
+
+#[utoipa::path(
+    put,
+    path = "/v1/users/update/me",
+    request_body = UsersUpdateRequestDto,
+    security(
+        ("Bearer" = [])
+    ),
+    responses(
+        (status = 201, description = "User Me Updated", body = MessageResponseDto),
+        (status = 400, description = "Invalid User Me data", body = MessageResponseDto)
+    ),
+    tag = "Users"
+)]
+pub async fn put_update_user_me(
+	headers: HeaderMap,
+	Json(payload): Json<UsersUpdateRequestDto>,
+) -> impl IntoResponse {
+	match permissions_middleware(&headers, vec![]).await {
+		Ok(_) => mutation_update_user_me(headers, Json(payload)).await,
 		Err(response) => response,
 	}
 }

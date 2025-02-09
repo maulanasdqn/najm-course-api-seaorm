@@ -48,6 +48,7 @@ pub struct UsersItemDto {
 	pub student_type: String,
 	pub religion: Option<String>,
 	pub gender: Option<String>,
+	pub is_profile_completed: Option<bool>,
 	pub role: Option<RolesItemDto>,
 	pub created_at: Option<String>,
 	pub updated_at: Option<String>,

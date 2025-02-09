@@ -39,6 +39,7 @@ pub async fn root_routes() -> Router {
             v1::users::users_controller::get_users,
             v1::users::users_controller::get_detail_user,
             v1::users::users_controller::get_user_me,
+            v1::users::users_controller::put_update_user_me,
             v1::users::users_controller::post_create_user,
             v1::users::users_controller::put_update_user,
             v1::users::users_controller::put_activate_user,

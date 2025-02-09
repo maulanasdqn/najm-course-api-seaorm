@@ -162,6 +162,7 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
 				role: Some(role_dto),
 				identity_number: user.identity_number,
 				is_active: user.is_active,
+				is_profile_completed: Some(user.is_profile_completed),
 				student_type: user.student_type,
 				religion: user.religion,
 				gender: user.gender,
@@ -184,6 +185,7 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
 				role: None,
 				identity_number: user.identity_number,
 				is_active: user.is_active,
+				is_profile_completed: Some(user.is_profile_completed),
 				student_type: user.student_type,
 				religion: user.religion,
 				gender: user.gender,
@@ -249,6 +251,7 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
 				role: Some(role_dto),
 				identity_number: user.identity_number,
 				is_active: user.is_active,
+				is_profile_completed: Some(user.is_profile_completed),
 				student_type: user.student_type,
 				religion: user.religion,
 				gender: user.gender,
@@ -271,6 +274,7 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
 				role: None,
 				identity_number: user.identity_number,
 				is_active: user.is_active,
+				is_profile_completed: Some(user.is_profile_completed),
 				student_type: user.student_type,
 				religion: user.religion,
 				gender: user.gender,
@@ -558,6 +562,132 @@ pub async fn mutation_set_active_inactive_user(
 
 	let mut active_model: UsersActiveModel = user.into();
 	active_model.is_active = Set(update_data.is_active);
+	active_model.updated_at = Set(Some(Utc::now()));
+
+	match active_model.update(&db).await {
+		Ok(_) => common_response(StatusCode::OK, "User updated successfully"),
+		Err(err) => {
+			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
+		}
+	}
+}
+
+pub async fn mutation_update_user_me(
+	headers: HeaderMap,
+	Json(update_data): Json<UsersUpdateRequestDto>,
+) -> Response {
+	let db = get_db().await;
+
+	let auth_header = match headers.get("Authorization") {
+		Some(header) => header.to_str(),
+		None => {
+			return common_response(StatusCode::FORBIDDEN, "You are not authorized")
+		}
+	};
+
+	let auth_header = match auth_header {
+		Ok(header) => header,
+		Err(err) => {
+			return common_response(StatusCode::BAD_REQUEST, &err.to_string())
+		}
+	};
+
+	let mut header_parts = auth_header.split_whitespace();
+
+	let token = match header_parts.nth(1) {
+		Some(token) => token,
+		None => {
+			return common_response(StatusCode::BAD_REQUEST, "Invalid token format")
+		}
+	};
+
+	let token_data = match decode_access_token(&token) {
+		Ok(data) => data,
+		Err(err) => {
+			return common_response(StatusCode::UNAUTHORIZED, &err.to_string())
+		}
+	};
+
+	let email = token_data.claims.email;
+
+	let user = match UsersEntity::find()
+		.filter(UsersColumn::Email.eq(email))
+		.filter(UsersColumn::IsDeleted.eq(false))
+		.one(&db)
+		.await
+	{
+		Ok(Some(user)) => user,
+		Ok(None) => return common_response(StatusCode::NOT_FOUND, "User not found"),
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let mut active_model: UsersActiveModel = user.into();
+
+	if let Some(email) = &update_data.email {
+		active_model.email = Set(email.clone());
+	}
+
+	if let Some(fullname) = &update_data.fullname {
+		active_model.fullname = Set(fullname.clone());
+	}
+
+	if let Some(avatar) = &update_data.avatar {
+		active_model.avatar = Set(Some(avatar.clone()));
+	}
+
+	if let Some(phone_number) = &update_data.phone_number {
+		active_model.phone_number = Set(phone_number.clone());
+	}
+
+	if let Some(role_id) = &update_data.role_id {
+		active_model.role_id = Set(Uuid::parse_str(role_id).unwrap());
+	}
+
+	if let Some(student_type) = &update_data.student_type {
+		active_model.student_type = Set(student_type.clone());
+	}
+
+	if let Some(birthdate) = &update_data.birthdate {
+		match NaiveDate::parse_from_str(birthdate, "%Y-%m-%d") {
+			Ok(parsed_date) => match parsed_date.and_hms_opt(0, 0, 0) {
+				Some(naive_datetime) => {
+					let datetime = naive_datetime.and_local_timezone(Utc).unwrap();
+					active_model.birth_date = Set(Some(datetime));
+				}
+				None => {
+					return common_response(
+						StatusCode::BAD_REQUEST,
+						"Invalid time components in birthdate",
+					);
+				}
+			},
+			Err(_) => {
+				return common_response(
+					StatusCode::BAD_REQUEST,
+					"Invalid birthdate format. Use YYYY-MM-DD.",
+				);
+			}
+		}
+	}
+
+	if let Some(gender) = &update_data.gender {
+		active_model.gender = Set(Some(gender.clone()));
+	}
+
+	if let Some(identity_number) = &update_data.identity_number {
+		active_model.identity_number = Set(Some(identity_number.clone()));
+	}
+
+	if let Some(religion) = &update_data.religion {
+		active_model.religion = Set(Some(religion.clone()));
+	}
+
+	active_model.is_profile_completed = Set(true);
 	active_model.updated_at = Set(Some(Utc::now()));
 
 	match active_model.update(&db).await {

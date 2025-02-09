@@ -126,5 +126,6 @@ pub struct AuthUsersItemDto {
 	pub fullname: String,
 	pub avatar: Option<String>,
 	pub phone_number: String,
+	pub is_profile_completed: bool,
 	pub role: Option<RolesItemDto>,
 }
