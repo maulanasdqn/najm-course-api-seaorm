@@ -34,6 +34,7 @@ jobs:
           echo "Stopping the service before uploading the binary"
           sudo systemctl stop najm-course-api
 
+    
     - name: Upload artifact to VPS
       uses: appleboy/scp-action@v0.1.7
       with:
@@ -43,6 +44,9 @@ jobs:
         port: ${{ secrets.VPS_PORT }}
         source: ./target/release/najm-course-api
         target: /opt/najm-course-api/najm-course-api
+        rm: true 
+        overwrite: true 
+
 
     - name: Deploy to server
       uses: appleboy/ssh-action@v0.1.7
