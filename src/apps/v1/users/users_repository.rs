@@ -168,6 +168,7 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
 				gender: user.gender,
 				created_at: user.created_at.map(|dt| dt.to_string()),
 				updated_at: user.updated_at.map(|dt| dt.to_string()),
+				birthdate: user.birth_date.map(|dt| dt.to_string()),
 			};
 
 			let response = ResponseSuccessDto { data: user_detail };
@@ -191,6 +192,7 @@ pub async fn query_get_user_me(headers: HeaderMap) -> Response {
 				gender: user.gender,
 				created_at: user.created_at.map(|dt| dt.to_string()),
 				updated_at: user.updated_at.map(|dt| dt.to_string()),
+				birthdate: user.birth_date.map(|dt| dt.to_string()),
 			};
 			let response = ResponseSuccessDto { data: user_detail };
 			success_response(response)
@@ -257,6 +259,7 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
 				gender: user.gender,
 				created_at: user.created_at.map(|dt| dt.to_string()),
 				updated_at: user.updated_at.map(|dt| dt.to_string()),
+				birthdate: user.birth_date.map(|dt| dt.to_string()),
 			};
 
 			let response = ResponseSuccessDto { data: user_detail };
@@ -280,6 +283,7 @@ pub async fn query_get_user_by_id(id_payload: String) -> Response {
 				gender: user.gender,
 				created_at: user.created_at.map(|dt| dt.to_string()),
 				updated_at: user.updated_at.map(|dt| dt.to_string()),
+				birthdate: user.birth_date.map(|dt| dt.to_string()),
 			};
 			let response = ResponseSuccessDto { data: user_detail };
 			success_response(response)
@@ -744,6 +748,7 @@ pub async fn mutation_update_user_me(
 						gender: user.gender,
 						created_at: user.created_at.map(|dt| dt.to_string()),
 						updated_at: user.updated_at.map(|dt| dt.to_string()),
+						birthdate: user.birth_date.map(|dt| dt.to_string()),
 					};
 
 					let response = ResponseSuccessDto { data: user_detail };
@@ -768,6 +773,7 @@ pub async fn mutation_update_user_me(
 						gender: user.gender,
 						created_at: user.created_at.map(|dt| dt.to_string()),
 						updated_at: user.updated_at.map(|dt| dt.to_string()),
+						birthdate: user.birth_date.map(|dt| dt.to_string()),
 					};
 					let response = ResponseSuccessDto { data: user_detail };
 					success_response(response)
