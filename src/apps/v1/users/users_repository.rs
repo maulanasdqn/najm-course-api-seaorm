@@ -611,7 +611,7 @@ pub async fn mutation_update_user_me(
 	let email = token_data.claims.email;
 
 	let user = match UsersEntity::find()
-		.filter(UsersColumn::Email.eq(email))
+		.filter(UsersColumn::Email.eq(&email))
 		.filter(UsersColumn::IsDeleted.eq(false))
 		.one(&db)
 		.await
@@ -691,7 +691,95 @@ pub async fn mutation_update_user_me(
 	active_model.updated_at = Set(Some(Utc::now()));
 
 	match active_model.update(&db).await {
-		Ok(_) => common_response(StatusCode::OK, "User updated successfully"),
+		Ok(_) => {
+			match UsersEntity::find()
+				.filter(UsersColumn::Email.eq(&email))
+				.find_also_related(RolesEntity)
+				.one(&db)
+				.await
+			{
+				Ok(Some((user, Some(role)))) => {
+					let permissions = RolesPermissionsEntity::find()
+						.filter(RolesPermissionsColumn::RoleId.eq(role.id))
+						.find_also_related(PermissionsEntity)
+						.all(&db)
+						.await;
+
+					let role_permissions = match permissions {
+						Ok(data) => data
+							.into_iter()
+							.filter_map(|(_, permission)| permission)
+							.map(|perm| PermissionsItemDto {
+								id: perm.id.to_string(),
+								name: perm.name,
+								created_at: perm.created_at.map(|dt| dt.to_string()),
+								updated_at: perm.updated_at.map(|dt| dt.to_string()),
+							})
+							.collect::<Vec<PermissionsItemDto>>(),
+						Err(_) => vec![],
+					};
+
+					let role_dto = RolesItemDto {
+						id: role.id.to_string(),
+						name: role.name,
+						permissions: role_permissions,
+						created_at: role.created_at.map(|dt| dt.to_string()),
+						updated_at: role.updated_at.map(|dt| dt.to_string()),
+					};
+
+					let user_detail = UsersItemDto {
+						id: user.id.to_string(),
+						email: user.email,
+						fullname: user.fullname,
+						avatar: user.avatar,
+						phone_number: user.phone_number,
+						referral_code: user.referral_code,
+						referred_by: user.referred_by,
+						role: Some(role_dto),
+						identity_number: user.identity_number,
+						is_active: user.is_active,
+						is_profile_completed: Some(user.is_profile_completed),
+						student_type: user.student_type,
+						religion: user.religion,
+						gender: user.gender,
+						created_at: user.created_at.map(|dt| dt.to_string()),
+						updated_at: user.updated_at.map(|dt| dt.to_string()),
+					};
+
+					let response = ResponseSuccessDto { data: user_detail };
+					success_response(response)
+				}
+
+				Ok(Some((user, None))) => {
+					let user_detail = UsersItemDto {
+						id: user.id.to_string(),
+						email: user.email,
+						fullname: user.fullname,
+						avatar: user.avatar,
+						phone_number: user.phone_number,
+						referral_code: user.referral_code,
+						referred_by: user.referred_by,
+						role: None,
+						identity_number: user.identity_number,
+						is_active: user.is_active,
+						is_profile_completed: Some(user.is_profile_completed),
+						student_type: user.student_type,
+						religion: user.religion,
+						gender: user.gender,
+						created_at: user.created_at.map(|dt| dt.to_string()),
+						updated_at: user.updated_at.map(|dt| dt.to_string()),
+					};
+					let response = ResponseSuccessDto { data: user_detail };
+					success_response(response)
+				}
+
+				Ok(None) => common_response(StatusCode::NOT_FOUND, "User not found"),
+				Err(err) => common_response(
+					StatusCode::INTERNAL_SERVER_ERROR,
+					&err.to_string(),
+				),
+			}
+		}
 		Err(err) => {
 			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
 		}
