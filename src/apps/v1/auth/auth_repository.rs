@@ -492,7 +492,7 @@ pub async fn mutation_verify_email(
 		return common_response(StatusCode::BAD_REQUEST, "Email is required");
 	}
 
-	let is_valid = otp_manager.validate_otp(redis, &payload.email, &payload.otp);
+	let is_valid = otp_manager.validate_otp(redis, &payload.email, payload.otp);
 
 	if is_valid {
 		if let Some(user) = UsersEntity::find()

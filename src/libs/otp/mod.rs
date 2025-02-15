@@ -17,18 +17,14 @@ impl OtpManager {
 		&self,
 		mut redis_conn: redis::Connection,
 		identifier: &str,
-	) -> String {
-		let otp: String = thread_rng()
-			.sample_iter(&rand::distributions::Alphanumeric)
-			.take(6)
-			.map(char::from)
-			.collect();
+	) -> u32 {
+		let otp: u32 = thread_rng().gen_range(100_000..1_000_000);
 
 		let key = format!("otp:{}", identifier);
-		let _: &() = &redis_conn
+		let _: () = redis_conn
 			.set_ex(
 				key.clone(),
-				otp.clone(),
+				otp.to_string(),
 				(self.ttl.as_secs() as usize).try_into().unwrap(),
 			)
 			.expect("Failed to store OTP in Redis");
@@ -40,11 +36,11 @@ impl OtpManager {
 		&self,
 		mut redis_conn: redis::Connection,
 		identifier: &str,
-		otp: &str,
+		otp: u32,
 	) -> bool {
 		let key = format!("otp:{}", identifier);
 		if let Ok(stored_otp) = redis_conn.get::<_, String>(&key) {
-			if stored_otp == otp {
+			if stored_otp == otp.to_string() {
 				let _: () = redis_conn
 					.del(&key)
 					.expect("Failed to delete OTP from Redis");

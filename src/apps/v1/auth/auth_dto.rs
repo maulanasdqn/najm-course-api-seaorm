@@ -93,7 +93,7 @@ pub struct AuthForgotRequestDto {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthVerifyEmailRequestDto {
 	pub email: String,
-	pub otp: String,
+	pub otp: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
