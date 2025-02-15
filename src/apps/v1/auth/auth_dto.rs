@@ -102,6 +102,12 @@ pub struct AuthNewPasswordRequestDto {
 	pub token: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct AuthChangePasswordRequestDto {
+	pub password: String,
+	pub old_password: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthTokenItemDto {
 	pub access_token: String,

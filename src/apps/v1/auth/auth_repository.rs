@@ -4,7 +4,7 @@ use super::{
 		AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
 		AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
 	},
-	AuthUsersItemDto,
+	AuthChangePasswordRequestDto, AuthUsersItemDto,
 };
 use crate::{
 	common_response, connect_redis, decode_access_token, decode_refresh_token,
@@ -21,6 +21,7 @@ use crate::{
 use axum::{http::StatusCode, response::Response, Json};
 use chrono::Utc;
 use email_address::EmailAddress;
+use hyper::HeaderMap;
 use redis::Commands;
 use sea_orm::{
 	prelude::Expr, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -627,4 +628,90 @@ pub async fn mutation_refresh(
 	};
 
 	success_response(auth_response)
+}
+
+pub async fn mutation_change_password(
+	headers: HeaderMap,
+	Json(payload): Json<AuthChangePasswordRequestDto>,
+) -> Response {
+	let db: DatabaseConnection = get_db().await;
+
+	let auth_header = match headers.get("Authorization") {
+		Some(header) => header.to_str(),
+		None => {
+			return common_response(StatusCode::FORBIDDEN, "You are not authorized")
+		}
+	};
+
+	let auth_header = match auth_header {
+		Ok(header) => header,
+		Err(err) => {
+			return common_response(StatusCode::BAD_REQUEST, &err.to_string())
+		}
+	};
+
+	let mut header_parts = auth_header.split_whitespace();
+
+	let token = match header_parts.nth(1) {
+		Some(token) => token,
+		None => {
+			return common_response(StatusCode::BAD_REQUEST, "Invalid token format")
+		}
+	};
+
+	let token_data = match decode_access_token(&token) {
+		Ok(data) => data,
+		Err(err) => {
+			return common_response(StatusCode::UNAUTHORIZED, &err.to_string())
+		}
+	};
+
+	if payload.password.len() < 8 {
+		return common_response(
+			StatusCode::BAD_REQUEST,
+			"Password must be at least 8 characters long",
+		);
+	}
+
+	let email = token_data.claims.email;
+
+	let old_password_query = UsersEntity::find()
+		.filter(UsersColumn::Email.eq(&email))
+		.one(&db)
+		.await
+		.unwrap();
+
+	let current_old_password = old_password_query.unwrap().password;
+	let payload_old_password = payload.old_password;
+
+	let is_old_password_correct =
+		verify_password(&payload_old_password, &current_old_password);
+
+	if !is_old_password_correct.unwrap() {
+		return common_response(StatusCode::FORBIDDEN, "Old password dont match");
+	}
+
+	let hashed_password = hash_password(&payload.password).unwrap();
+
+	if let Some(user) = UsersEntity::find()
+		.filter(UsersColumn::Email.eq(email.clone()))
+		.one(&db)
+		.await
+		.ok()
+		.flatten()
+	{
+		let mut active_user: UsersActiveModel = user.into();
+		active_user.password = Set(hashed_password);
+
+		if let Err(err) = active_user.update(&db).await {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			);
+		}
+
+		return common_response(StatusCode::OK, "Password updated successfully");
+	}
+
+	common_response(StatusCode::NOT_FOUND, "User not found")
 }

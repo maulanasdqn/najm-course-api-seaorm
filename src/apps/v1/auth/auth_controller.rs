@@ -1,14 +1,16 @@
 use crate::{MessageResponseDto, ResponseSuccessDto};
 
 use super::{
-	mutation_forgot_password, mutation_login, mutation_new_password,
-	mutation_refresh, mutation_register, mutation_send_otp, mutation_verify_email,
-	AuthDataDto, AuthForgotRequestDto, AuthLoginRequestDto,
-	AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto, AuthRegisterRequestDto,
-	AuthTokenItemDto, AuthVerifyEmailRequestDto,
+	mutation_change_password, mutation_forgot_password, mutation_login,
+	mutation_new_password, mutation_refresh, mutation_register, mutation_send_otp,
+	mutation_verify_email, AuthChangePasswordRequestDto, AuthDataDto,
+	AuthForgotRequestDto, AuthLoginRequestDto, AuthNewPasswordRequestDto,
+	AuthRefreshTokenRequestDto, AuthRegisterRequestDto, AuthTokenItemDto,
+	AuthVerifyEmailRequestDto,
 };
 
 use axum::{extract::Json, response::IntoResponse};
+use hyper::HeaderMap;
 
 #[utoipa::path(
     post,
@@ -127,4 +129,25 @@ pub async fn post_refresh(
 	Json(payload): Json<AuthRefreshTokenRequestDto>,
 ) -> impl IntoResponse {
 	mutation_refresh(Json(payload)).await
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/users/change-password",
+    security(
+        ("Bearer" = [])
+    ),
+    request_body = AuthChangePasswordRequestDto,
+    responses(
+        (status = 200, description = "Change Password successful", body = MessageResponseDto),
+        (status = 401, description = "Unauthorized", body = MessageResponseDto)
+    ),
+    tag = "Authentication"
+)]
+
+pub async fn post_change_password(
+	headers: HeaderMap,
+	Json(payload): Json<AuthChangePasswordRequestDto>,
+) -> impl IntoResponse {
+	mutation_change_password(headers, Json(payload)).await
 }
