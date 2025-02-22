@@ -1,7 +1,4 @@
-use crate::{common_response, roles::RolesItemDto};
-use axum::response::Response;
-use email_address::EmailAddress;
-use hyper::StatusCode;
+use crate::roles::RolesItemDto;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -16,63 +13,6 @@ pub struct Email(String);
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Password(String);
-
-impl Email {
-	pub fn parse(email: &String) -> Result<Email, Response> {
-		match email.is_empty() {
-			true => Err(common_response(
-				StatusCode::BAD_REQUEST,
-				"Email cannot be empty",
-			)),
-			false => match EmailAddress::is_valid(&email) {
-				true => Ok(Email(email.to_string())),
-				false => Err(common_response(
-					StatusCode::BAD_REQUEST,
-					"Email must be valid",
-				)),
-			},
-		}
-	}
-
-	pub fn as_str(&self) -> &str {
-		&self.0
-	}
-}
-
-impl Password {
-	pub fn parse(password: &String) -> Result<Password, Response> {
-		match password.len() {
-			0 => Err(common_response(
-				StatusCode::BAD_REQUEST,
-				"Password cannot be empty",
-			)),
-			1..=7 => Err(common_response(
-				StatusCode::BAD_REQUEST,
-				"Password cannot be empty",
-			)),
-			8..=64 => {
-				let has_uppercase = password.chars().any(|c| c.is_uppercase());
-				let has_lowercase = password.chars().any(|c| c.is_lowercase());
-				let has_digit = password.chars().any(|c| c.is_ascii_digit());
-				match (has_uppercase, has_lowercase, has_digit) {
-                    (true, true, true) => Ok(Password(password.to_string())),
-                    _ => Err(common_response(
-                        StatusCode::BAD_REQUEST,
-                        "Password must contain at least one uppercase letter, one lowercase letter, and one number",
-                    )),
-                }
-			}
-			_ => Err(common_response(
-				StatusCode::BAD_REQUEST,
-				"Password must be at most 64 characters long",
-			)),
-		}
-	}
-
-	pub fn as_str(&self) -> &str {
-		&self.0
-	}
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct AuthRegisterRequestDto {

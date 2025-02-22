@@ -1,15 +1,9 @@
 pub use sea_orm_migration::prelude::*;
-
-mod m20250121_00001_create_tables;
-
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
-    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(
-            m20250201_124346_create_exams_related_table::Migration,
-        )]
-    }
+	fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+		vec![Box::new()]
+	}
 }
-mod m20250201_124346_create_exams_related_table;
