@@ -1,16 +1,17 @@
+use crate::Config;
 use lettre::message::Mailbox;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
-use std::env;
 
 pub fn send_email(
 	to: &str,
 	subject: &str,
 	body: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let sender_email = env::var("SMTP_EMAIL")?.to_string();
-	let sender_name = env::var("SMTP_NAME")?.to_string();
-	let sender_password = env::var("SMTP_PASSWORD")?.to_string();
+	let config = Config::new();
+	let sender_email = config.smtp_email;
+	let sender_name = config.smtp_name;
+	let sender_password = config.smtp_password;
 	let recipient_email = to;
 
 	let email = Message::builder()

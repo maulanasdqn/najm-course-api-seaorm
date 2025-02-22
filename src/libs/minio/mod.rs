@@ -4,10 +4,11 @@ use mime_guess::from_path;
 use minio_rsc::client::Minio;
 use minio_rsc::error::Error;
 use minio_rsc::provider::StaticProvider;
-use std::env;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+use crate::Config;
 
 #[derive(Clone)]
 pub struct MinioClient {
@@ -32,23 +33,11 @@ const ALLOWED_IMAGE_MIME_TYPES: &[&str] = &[
 
 impl MinioClient {
 	pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-		let bucket_name = env::var("MINIO_BUCKET_NAME").map_err(|e| {
-			error!("MINIO_BUCKET_NAME is not set: {}", e);
-			e
-		})?;
-		let endpoint = env::var("MINIO_ENDPOINT").map_err(|e| {
-			error!("MINIO_ENDPOINT is not set: {}", e);
-			e
-		})?;
-		let access_key = env::var("MINIO_ACCESS_KEY").map_err(|e| {
-			error!("MINIO_ACCESS_KEY is not set: {}", e);
-			e
-		})?;
-		let secret_key = env::var("MINIO_SECRET_KEY").map_err(|e| {
-			error!("MINIO_SECRET_KEY is not set: {}", e);
-			e
-		})?;
-
+		let config = Config::new();
+		let bucket_name = config.minio_bucket_name;
+		let endpoint = config.minio_endpoint;
+		let access_key = config.minio_access_key;
+		let secret_key = config.minio_secret_key;
 		let provider = StaticProvider::new(&access_key, &secret_key, None);
 
 		let client = Minio::builder()
@@ -73,6 +62,7 @@ impl MinioClient {
 		original_filename: &str,
 		data: Vec<u8>,
 	) -> Result<String, Error> {
+		let config = Config::new();
 		let sanitized_filename = original_filename
 			.chars()
 			.filter(|c| c.is_alphanumeric() || *c == '.' || *c == '_' || *c == '-')
@@ -109,8 +99,7 @@ impl MinioClient {
 			data.len() / 1024
 		);
 
-		let endpoint =
-			env::var("MINIO_ENDPOINT").expect("MINIO_ENDPOINT must be set");
+		let endpoint = config.minio_endpoint;
 
 		self.client
 			.put_object(&self.bucket_name, &unique_filename, Bytes::from(data))

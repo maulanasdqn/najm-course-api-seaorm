@@ -1,10 +1,13 @@
 pub mod schemas;
 use log::{error, info};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
-use std::{env, time::Duration};
+use std::time::Duration;
+
+use crate::Config;
 
 pub async fn get_db() -> DatabaseConnection {
-	let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+	let config = Config::new();
+	let database_url = config.database_url;
 	let mut opt = ConnectOptions::new(&database_url);
 	opt.max_connections(100)
 		.min_connections(5)

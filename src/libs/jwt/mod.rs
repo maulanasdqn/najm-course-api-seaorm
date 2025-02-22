@@ -4,7 +4,8 @@ use jsonwebtoken::{
 	decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
 use serde::{Deserialize, Serialize};
-use std::env;
+
+use crate::Config;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
@@ -14,9 +15,8 @@ pub struct Claims {
 }
 
 pub fn encode_access_token(email: &str) -> Result<String, StatusCode> {
-	let secret: String = env::var("ACCESS_TOKEN_SECRET")
-		.expect("ACCESS_TOKEN_SECRET must be set")
-		.to_string();
+	let config = Config::new();
+	let secret: String = config.access_token_secret;
 	let now = Utc::now();
 	let expire: chrono::TimeDelta = Duration::minutes(15);
 	let exp: usize = (now + expire).timestamp() as usize;
@@ -37,9 +37,8 @@ pub fn encode_access_token(email: &str) -> Result<String, StatusCode> {
 pub fn decode_access_token(
 	jwt_token: &str,
 ) -> Result<TokenData<Claims>, StatusCode> {
-	let secret = env::var("ACCESS_TOKEN_SECRET")
-		.expect("ACCESS_TOKEN_SECRET must be set")
-		.to_string();
+	let config = Config::new();
+	let secret: String = config.access_token_secret;
 	let result: Result<TokenData<Claims>, StatusCode> = decode(
 		&jwt_token,
 		&DecodingKey::from_secret(secret.as_ref()),
@@ -50,9 +49,8 @@ pub fn decode_access_token(
 }
 
 pub fn encode_refresh_token(email: &str) -> Result<String, StatusCode> {
-	let secret: String = env::var("REFRESH_TOKEN_SECRET")
-		.expect("REFRESH_TOKEN_SECRET must be set")
-		.to_string();
+	let config = Config::new();
+	let secret: String = config.refresh_token_secret;
 	let now = Utc::now();
 	let expire: chrono::TimeDelta = Duration::days(1);
 	let exp: usize = (now + expire).timestamp() as usize;
@@ -73,9 +71,8 @@ pub fn encode_refresh_token(email: &str) -> Result<String, StatusCode> {
 pub fn decode_refresh_token(
 	jwt_token: &str,
 ) -> Result<TokenData<Claims>, StatusCode> {
-	let secret = env::var("REFRESH_TOKEN_SECRET")
-		.expect("REFRESH_TOKEN_SECRET must be set")
-		.to_string();
+	let config = Config::new();
+	let secret: String = config.refresh_token_secret;
 	let result: Result<TokenData<Claims>, StatusCode> = decode(
 		&jwt_token,
 		&DecodingKey::from_secret(secret.as_ref()),
