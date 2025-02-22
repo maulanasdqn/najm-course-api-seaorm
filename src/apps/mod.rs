@@ -19,10 +19,16 @@ use utoipa::{
 };
 use utoipa_swagger_ui::SwaggerUi;
 use v1::{
-	auth::{AuthDataDto, AuthTokenItemDto},
-	permissions::PermissionsItemDto,
-	roles::{RolesItemDto, RolesItemListDto},
-	users::{UsersItemDto, UsersItemListDto},
+	AuthChangePasswordRequestDto, AuthDataDto, AuthForgotRequestDto,
+	AuthLoginRequestDto, AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
+	AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
+	OptionsItemDto, PermissionsItemDto, PermissionsRequestDto, QuestionsItemDto,
+	RolesItemDto, RolesItemListDto, RolesRequestCreateDto, RolesRequestUpdateDto,
+	SessionsItemDto, SessionsItemListDto, SessionsRequestCreateDto,
+	SessionsRequestUpdateDto, StorageRequestDto, StorageResponseDto, TestsItemDto,
+	TestsItemListDto, TestsRequestCreateDto, TestsRequestUpdateDto,
+	UsersActiveInactiveRequestDto, UsersCreateRequestDto, UsersItemDto,
+	UsersItemListDto, UsersUpdateRequestDto,
 };
 
 pub async fn root_routes() -> Router {
@@ -37,6 +43,7 @@ pub async fn root_routes() -> Router {
             v1::auth::auth_controller::post_new_password,
             v1::auth::auth_controller::post_change_password,
             v1::auth::auth_controller::post_refresh,
+
             v1::users::users_controller::get_users,
             v1::users::users_controller::get_detail_user,
             v1::users::users_controller::get_user_me,
@@ -45,61 +52,97 @@ pub async fn root_routes() -> Router {
             v1::users::users_controller::put_update_user,
             v1::users::users_controller::put_activate_user,
             v1::users::users_controller::delete_user,
+
             v1::roles::roles_controller::get_roles,
             v1::roles::roles_controller::get_detail_role,
             v1::roles::roles_controller::post_create_role,
             v1::roles::roles_controller::put_update_role,
             v1::roles::roles_controller::delete_role,
+
             v1::permissions::permissions_controller::get_permissions,
             v1::permissions::permissions_controller::get_detail_permission,
             v1::permissions::permissions_controller::post_create_permission,
             v1::permissions::permissions_controller::put_update_permission,
             v1::permissions::permissions_controller::delete_permission,
-            v1::storage::storage_controller::post_upload,
+
             v1::sessions::sessions_controller::get_sessions,
             v1::sessions::sessions_controller::get_detail_session,
             v1::sessions::sessions_controller::post_create_session,
             v1::sessions::sessions_controller::put_update_session,
             v1::sessions::sessions_controller::delete_session,
+
+            v1::tests::tests_controller::get_tests,
+            v1::tests::tests_controller::get_detail_test,
+            v1::tests::tests_controller::post_create_test,
+            v1::tests::tests_controller::put_update_test,
+            v1::tests::tests_controller::delete_test,
+
+            v1::storage::storage_controller::post_upload,
+
         ),
         components(
             schemas(
                 MetaRequestDto,
                 MetaResponseDto,
                 MessageResponseDto,
+
                 ResponseSuccessDto<AuthTokenItemDto>,
                 ResponseSuccessDto<AuthDataDto>,
+
                 ResponseSuccessDto<UsersItemDto>,
                 ResponseSuccessListDto<UsersItemListDto>,
+
                 ResponseSuccessListDto<RolesItemListDto>,
                 ResponseSuccessDto<RolesItemDto>,
+
                 ResponseSuccessListDto<PermissionsItemDto>,
                 ResponseSuccessDto<PermissionsItemDto>,
-                v1::storage::storage_dto::StorageRequestDto,
-                v1::storage::storage_dto::StorageResponseDto,
-                v1::auth::auth_dto::AuthLoginRequestDto,
-                v1::auth::auth_dto::AuthRegisterRequestDto,
-                v1::auth::auth_dto::AuthTokenItemDto,
-                v1::auth::auth_dto::AuthDataDto,
-                v1::auth::auth_dto::AuthForgotRequestDto,
-                v1::auth::auth_dto::AuthVerifyEmailRequestDto,
-                v1::auth::auth_dto::AuthNewPasswordRequestDto,
-                v1::auth::auth_dto::AuthChangePasswordRequestDto,
-                v1::auth::auth_dto::AuthRefreshTokenRequestDto,
-                v1::users::users_dto::UsersCreateRequestDto,
-                v1::users::users_dto::UsersActiveInactiveRequestDto,
-                v1::users::users_dto::UsersUpdateRequestDto,
-                v1::users::users_dto::UsersItemDto,
-                v1::roles::roles_dto::RolesItemDto,
-                v1::roles::roles_dto::RolesItemListDto,
-                v1::roles::roles_dto::RolesRequestCreateDto,
-                v1::roles::roles_dto::RolesRequestUpdateDto,
-                v1::permissions::permissions_dto::PermissionsItemDto,
-                v1::permissions::permissions_dto::PermissionsRequestDto,
-                v1::sessions::sessions_dto::SessionsItemDto,
-                v1::sessions::sessions_dto::SessionsItemListDto,
-                v1::sessions::sessions_dto::SessionsRequestCreateDto,
-                v1::sessions::sessions_dto::SessionsRequestUpdateDto,
+
+                ResponseSuccessListDto<SessionsItemListDto>,
+                ResponseSuccessDto<SessionsItemDto>,
+
+                ResponseSuccessListDto<TestsItemListDto>,
+                ResponseSuccessDto<TestsItemDto>,
+
+                ResponseSuccessDto<StorageResponseDto>,
+
+                StorageRequestDto,
+                StorageResponseDto,
+
+                AuthLoginRequestDto,
+                AuthRegisterRequestDto,
+                AuthTokenItemDto,
+                AuthDataDto,
+                AuthForgotRequestDto,
+                AuthVerifyEmailRequestDto,
+                AuthNewPasswordRequestDto,
+                AuthChangePasswordRequestDto,
+                AuthRefreshTokenRequestDto,
+
+                UsersCreateRequestDto,
+                UsersActiveInactiveRequestDto,
+                UsersUpdateRequestDto,
+                UsersItemDto,
+
+                RolesItemDto,
+                RolesItemListDto,
+                RolesRequestCreateDto,
+                RolesRequestUpdateDto,
+
+                PermissionsItemDto,
+                PermissionsRequestDto,
+
+                SessionsItemDto,
+                SessionsItemListDto,
+                SessionsRequestCreateDto,
+                SessionsRequestUpdateDto,
+
+                TestsItemDto,
+                TestsItemListDto,
+                TestsRequestCreateDto,
+                TestsRequestUpdateDto,
+                QuestionsItemDto,
+                OptionsItemDto,
             )
         ),
         info(
@@ -164,6 +207,7 @@ pub async fn root_routes() -> Router {
 		.nest("/users", v1::users::users_router())
 		.nest("/roles", v1::roles::roles_router())
 		.nest("/sessions", v1::sessions::sessions_router())
+		.nest("/tests", v1::tests::tests_router())
 		.nest("/permissions", v1::permissions::permissions_router())
 		.nest("/storage", v1::storage::storage_router().await)
 		.layer(from_fn(v1::auth::auth_middleware::authorization_middleware));
