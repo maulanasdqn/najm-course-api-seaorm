@@ -56,6 +56,11 @@ pub async fn root_routes() -> Router {
             v1::permissions::permissions_controller::put_update_permission,
             v1::permissions::permissions_controller::delete_permission,
             v1::storage::storage_controller::post_upload,
+            v1::sessions::sessions_controller::get_sessions,
+            v1::sessions::sessions_controller::get_detail_session,
+            v1::sessions::sessions_controller::post_create_session,
+            v1::sessions::sessions_controller::put_update_session,
+            v1::sessions::sessions_controller::delete_session,
         ),
         components(
             schemas(
@@ -91,6 +96,10 @@ pub async fn root_routes() -> Router {
                 v1::roles::roles_dto::RolesRequestUpdateDto,
                 v1::permissions::permissions_dto::PermissionsItemDto,
                 v1::permissions::permissions_dto::PermissionsRequestDto,
+                v1::sessions::sessions_dto::SessionsItemDto,
+                v1::sessions::sessions_dto::SessionsItemListDto,
+                v1::sessions::sessions_dto::SessionsRequestCreateDto,
+                v1::sessions::sessions_dto::SessionsRequestUpdateDto,
             )
         ),
         info(
@@ -154,6 +163,7 @@ pub async fn root_routes() -> Router {
 	let v1_protected_routes = Router::new()
 		.nest("/users", v1::users::users_router())
 		.nest("/roles", v1::roles::roles_router())
+		.nest("/sessions", v1::sessions::sessions_router())
 		.nest("/permissions", v1::permissions::permissions_router())
 		.nest("/storage", v1::storage::storage_router().await)
 		.layer(from_fn(v1::auth::auth_middleware::authorization_middleware));

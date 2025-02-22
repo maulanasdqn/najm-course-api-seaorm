@@ -17,6 +17,11 @@ pub enum PermissionsEnum {
 	CreatePermissions,
 	DeletePermissions,
 	UpdatePermissions,
+	ReadListSessions,
+	ReadDetailSessions,
+	CreateSessions,
+	UpdateSessions,
+	DeleteSessions,
 }
 
 impl fmt::Display for PermissionsEnum {
@@ -37,6 +42,11 @@ impl fmt::Display for PermissionsEnum {
 			PermissionsEnum::CreatePermissions => "Create Permissions",
 			PermissionsEnum::DeletePermissions => "Delete Permissions",
 			PermissionsEnum::UpdatePermissions => "Update Permissions",
+			PermissionsEnum::ReadListSessions => "Read List Sessions",
+			PermissionsEnum::ReadDetailSessions => "Read Detail Sessions",
+			PermissionsEnum::CreateSessions => "Create Sessions",
+			PermissionsEnum::UpdateSessions => "Update Sessions",
+			PermissionsEnum::DeleteSessions => "Delete Sessions",
 		};
 		write!(f, "{}", permission_str)
 	}
