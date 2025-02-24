@@ -1,31 +1,50 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct IndividualQuestionsRequestCreateDto {
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TestAnswersItemDto {
+	pub id: String,
+	pub user_id: String,
 	pub test_id: String,
-	pub question: String,
-	pub discussion: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct IndividualOptionsRequestCreateDto {
-	pub label: String,
 	pub question_id: String,
-	pub is_correct: bool,
+	pub option_id: Option<String>,
+	pub answer: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct OptionsItemDto {
-	pub label: String,
-	pub is_correct: bool,
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TestAnswersRequestCreateDto {
+	pub user_id: String,
+	pub test_id: String,
+	pub question_id: String,
+	pub option_id: Option<String>,
+	pub answer: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct QuestionsItemDto {
+	pub id: String,
 	pub question: String,
 	pub discussion: String,
 	pub options: Vec<OptionsItemDto>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct OptionsItemDto {
+	pub id: String,
+	pub label: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct QuestionsRequestCreateDto {
+	pub question: String,
+	pub discussion: String,
+	pub options: Vec<OptionsRequestCreateDto>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct OptionsRequestCreateDto {
+	pub label: String,
+	pub is_correct: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -37,7 +56,7 @@ pub struct TestsRequestUpdateDto {
 pub struct TestsRequestCreateDto {
 	pub test_name: String,
 	pub session_id: String,
-	pub questions: Vec<QuestionsItemDto>,
+	pub questions: Vec<QuestionsRequestCreateDto>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

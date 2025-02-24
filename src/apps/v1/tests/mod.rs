@@ -17,4 +17,13 @@ pub fn tests_router() -> Router {
 		.route("/detail/{id}", get(tests_controller::get_detail_test))
 		.route("/update/{id}", put(tests_controller::put_update_test))
 		.route("/delete/{id}", delete(tests_controller::delete_test))
+		.route("/answer/{id}", get(tests_controller::get_test_answer))
+		.route(
+			"/answer/delete/{id}",
+			delete(tests_controller::delete_test_answer),
+		)
+		.route(
+			"/answer/create",
+			post(tests_controller::post_create_test_answer),
+		)
 }

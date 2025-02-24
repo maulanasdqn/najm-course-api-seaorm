@@ -4,18 +4,19 @@ use crate::apps::v1::{
 	AuthChangePasswordRequestDto, AuthDataDto, AuthForgotRequestDto,
 	AuthLoginRequestDto, AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
 	AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
-	OptionsItemDto, PermissionsItemDto, PermissionsRequestDto, QuestionsItemDto,
-	RolesItemDto, RolesItemListDto, RolesRequestCreateDto, RolesRequestUpdateDto,
-	SessionsItemDto, SessionsItemListDto, SessionsRequestCreateDto,
-	SessionsRequestUpdateDto, StorageRequestDto, StorageResponseDto, TestsItemDto,
-	TestsItemListDto, TestsRequestCreateDto, TestsRequestUpdateDto,
-	UsersActiveInactiveRequestDto, UsersCreateRequestDto, UsersItemDto,
-	UsersItemListDto, UsersUpdateRequestDto,
+	OptionsItemDto, OptionsRequestCreateDto, PermissionsItemDto,
+	PermissionsRequestDto, QuestionsItemDto, RolesItemDto, RolesItemListDto,
+	RolesRequestCreateDto, RolesRequestUpdateDto, SessionsItemDto,
+	SessionsItemListDto, SessionsRequestCreateDto, SessionsRequestUpdateDto,
+	StorageRequestDto, StorageResponseDto, TestsItemDto, TestsItemListDto,
+	TestsRequestCreateDto, TestsRequestUpdateDto, UsersActiveInactiveRequestDto,
+	UsersCreateRequestDto, UsersItemDto, UsersItemListDto, UsersUpdateRequestDto,
 };
 
 use crate::{
-	MessageResponseDto, MetaRequestDto, MetaResponseDto, ResponseSuccessDto,
-	ResponseSuccessListDto,
+	MessageResponseDto, MetaRequestDto, MetaResponseDto, QuestionsRequestCreateDto,
+	ResponseSuccessDto, ResponseSuccessListDto, TestAnswersItemDto,
+	TestAnswersRequestCreateDto,
 };
 
 use utoipa::{
@@ -67,6 +68,9 @@ use utoipa::{
         v1::tests::tests_controller::post_create_test,
         v1::tests::tests_controller::put_update_test,
         v1::tests::tests_controller::delete_test,
+        v1::tests::tests_controller::get_test_answer,
+        v1::tests::tests_controller::post_create_test_answer,
+        v1::tests::tests_controller::delete_test_answer,
 
         v1::storage::storage_controller::post_upload,
     ),
@@ -93,6 +97,8 @@ use utoipa::{
 
            ResponseSuccessListDto<TestsItemListDto>,
            ResponseSuccessDto<TestsItemDto>,
+
+           ResponseSuccessDto<TestAnswersItemDto>,
 
            ResponseSuccessDto<StorageResponseDto>,
 
@@ -131,6 +137,10 @@ use utoipa::{
            TestsItemListDto,
            TestsRequestCreateDto,
            TestsRequestUpdateDto,
+           TestAnswersItemDto,
+           TestAnswersRequestCreateDto,
+           QuestionsRequestCreateDto,
+           OptionsRequestCreateDto,
            QuestionsItemDto,
            OptionsItemDto,
         )

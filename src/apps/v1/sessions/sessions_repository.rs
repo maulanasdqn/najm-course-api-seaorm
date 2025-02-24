@@ -1,5 +1,6 @@
 use axum::{http::StatusCode, response::Response, Json};
 use chrono::Utc;
+use futures::future::join_all;
 use sea_orm::{
 	prelude::*, sea_query::extension::postgres::PgExpr, ActiveModelTrait,
 	ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait,
@@ -13,7 +14,8 @@ use crate::{
 		TestSessionsActiveModel, TestSessionsColumn, TestSessionsEntity, TestsEntity,
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
-	ResponseSuccessDto, ResponseSuccessListDto,
+	QuestionsColumn, QuestionsEntity, ResponseSuccessDto, ResponseSuccessListDto,
+	TestsItemListDto,
 };
 
 use super::sessions_dto::{
@@ -137,18 +139,45 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		}
 	};
 
-	let test_count = TestsEntity::find()
+	let tests_entities = match TestsEntity::find()
 		.filter(crate::schemas::TestsColumn::SessionId.eq(session.id))
-		.count(&db)
+		.all(&db)
 		.await
-		.unwrap_or(0);
+	{
+		Ok(tests) => tests,
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let tests_dto_futures = tests_entities.into_iter().map(|test| {
+		let db = db.clone();
+		async move {
+			let question_count = QuestionsEntity::find()
+				.filter(QuestionsColumn::TestId.eq(test.id))
+				.count(&db)
+				.await
+				.unwrap_or(0);
+			TestsItemListDto {
+				id: test.id.to_string(),
+				test_name: test.test_name,
+				question_count,
+				created_at: test.created_at.map(|dt| dt.to_string()),
+				updated_at: test.updated_at.map(|dt| dt.to_string()),
+			}
+		}
+	});
+	let tests_dto: Vec<TestsItemListDto> = join_all(tests_dto_futures).await;
 
 	let session_dto = SessionsItemDto {
 		id: session.id.to_string(),
 		session_name: session.session_name,
 		start_date: session.start_date.to_string(),
 		end_date: session.end_date.to_string(),
-		test_count,
+		tests: tests_dto,
 		created_at: session.created_at.map(|dt| dt.to_string()),
 		updated_at: session.updated_at.map(|dt| dt.to_string()),
 	};

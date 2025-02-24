@@ -16,12 +16,16 @@ use crate::{
 		TestsEntity,
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
-	ResponseSuccessDto, ResponseSuccessListDto,
+	ResponseSuccessDto, ResponseSuccessListDto, TestAnswersActiveModel,
+	TestAnswersColumn, TestAnswersEntity,
 };
 
-use super::tests_dto::{
-	OptionsItemDto, QuestionsItemDto, TestsItemDto, TestsItemListDto,
-	TestsRequestCreateDto, TestsRequestUpdateDto,
+use super::{
+	tests_dto::{
+		OptionsItemDto, QuestionsItemDto, TestsItemDto, TestsItemListDto,
+		TestsRequestCreateDto, TestsRequestUpdateDto,
+	},
+	TestAnswersItemDto, TestAnswersRequestCreateDto,
 };
 
 pub async fn query_get_tests(params: MetaRequestDto) -> Response {
@@ -143,12 +147,13 @@ pub async fn query_get_test_by_id(id: String) -> Response {
 				let options_dto: Vec<OptionsItemDto> = options
 					.into_iter()
 					.map(|opt| OptionsItemDto {
+						id: opt.id.to_string(),
 						label: opt.label,
-						is_correct: opt.is_correct,
 					})
 					.collect();
 
 				QuestionsItemDto {
+					id: q.id.to_string(),
 					question: q.question,
 					discussion: q.discussion,
 					options: options_dto,
@@ -216,7 +221,6 @@ pub async fn mutation_create_test(payload: Json<TestsRequestCreateDto>) -> Respo
 				id: Set(Uuid::new_v4()),
 				question_id: Set(inserted_question.id),
 				label: Set(option.label.clone()),
-				is_correct: Set(option.is_correct),
 				..Default::default()
 			};
 
@@ -308,6 +312,117 @@ pub async fn mutation_delete_test(id: String) -> Response {
 
 	match test.delete(&db).await {
 		Ok(_) => common_response(StatusCode::OK, "Test deleted successfully"),
+		Err(err) => {
+			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
+		}
+	}
+}
+
+pub async fn query_get_test_answer_by_id(id: String) -> Response {
+	let db: DatabaseConnection = get_db().await;
+
+	let answer = match TestAnswersEntity::find()
+		.filter(TestAnswersColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
+		.one(&db)
+		.await
+	{
+		Ok(Some(answer)) => answer,
+		Ok(None) => {
+			return common_response(StatusCode::NOT_FOUND, "Test answer not found")
+		}
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let dto = TestAnswersItemDto {
+		id: answer.id.to_string(),
+		user_id: answer.user_id.to_string(),
+		test_id: answer.test_id.to_string(),
+		question_id: answer.question_id.to_string(),
+		option_id: answer.option_id.map(|id| id.to_string()),
+		answer: answer.answer,
+	};
+
+	let response = ResponseSuccessDto { data: dto };
+	success_response(response)
+}
+
+pub async fn mutation_create_test_answer(
+	payload: Json<TestAnswersRequestCreateDto>,
+) -> Response {
+	let db: DatabaseConnection = get_db().await;
+
+	let new_answer = TestAnswersActiveModel {
+		id: Set(Uuid::new_v4()),
+		user_id: Set(Uuid::parse_str(&payload.user_id).unwrap_or_default()),
+		test_id: Set(Uuid::parse_str(&payload.test_id).unwrap_or_default()),
+		question_id: Set(Uuid::parse_str(&payload.question_id).unwrap_or_default()),
+		option_id: Set(payload
+			.option_id
+			.as_ref()
+			.and_then(|s| Uuid::parse_str(s).ok())),
+		answer: Set(payload.answer.clone()),
+		..Default::default()
+	};
+
+	let answer = match new_answer.insert(&db).await {
+		Ok(answer) => answer,
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let dto = TestAnswersItemDto {
+		id: answer.id.to_string(),
+		user_id: answer.user_id.to_string(),
+		test_id: answer.test_id.to_string(),
+		question_id: answer.question_id.to_string(),
+		option_id: answer.option_id.map(|id| id.to_string()),
+		answer: answer.answer,
+	};
+
+	let response = ResponseSuccessDto { data: dto };
+	success_response(response)
+}
+
+pub async fn mutation_delete_test_answer(id: String) -> Response {
+	let db: DatabaseConnection = get_db().await;
+	let answer_id = match Uuid::parse_str(&id) {
+		Ok(uuid) => uuid,
+		Err(_) => {
+			return common_response(
+				StatusCode::BAD_REQUEST,
+				"Invalid test answer ID",
+			)
+		}
+	};
+
+	let answer = match TestAnswersEntity::find()
+		.filter(TestAnswersColumn::Id.eq(answer_id))
+		.one(&db)
+		.await
+	{
+		Ok(Some(answer)) => answer,
+		Ok(None) => {
+			return common_response(StatusCode::NOT_FOUND, "Test answer not found")
+		}
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	match answer.delete(&db).await {
+		Ok(_) => common_response(StatusCode::OK, "Test answer deleted successfully"),
 		Err(err) => {
 			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
 		}

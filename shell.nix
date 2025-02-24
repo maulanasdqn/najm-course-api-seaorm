@@ -34,7 +34,15 @@ pkgs.mkShell {
     '')
 
     (writeScriptBin "dev" ''
-      cargo watch -x run -q
+      cargo watch -x "run --bin server -q"
+    '')
+
+    (writeScriptBin "migrate" ''
+      cargo run --bin migrate -q
+    '')
+
+    (writeScriptBin "seed" ''
+      cargo run --bin seed -q
     '')
 
     (writeScriptBin "start" ''

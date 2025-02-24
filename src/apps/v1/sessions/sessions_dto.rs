@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::TestsItemListDto;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SessionsRequestUpdateDto {
 	pub session_name: Option<String>,
@@ -32,7 +34,7 @@ pub struct SessionsItemDto {
 	pub session_name: String,
 	pub start_date: String,
 	pub end_date: String,
-	pub test_count: u64,
+	pub tests: Vec<TestsItemListDto>,
 	pub created_at: Option<String>,
 	pub updated_at: Option<String>,
 }

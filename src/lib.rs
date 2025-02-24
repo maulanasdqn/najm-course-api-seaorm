@@ -3,7 +3,7 @@ pub mod config;
 pub mod libs;
 pub mod utils;
 
-pub use apps::v1::*;
+pub use apps::*;
 pub use config::*;
 pub use libs::*;
 pub use utils::*;

@@ -15,6 +15,7 @@ pub use app_roles_permissions_schema::Column as RolesPermissionsColumn;
 pub use app_roles_schema::Column as RolesColumn;
 pub use app_test_sessions_schema::Column as TestSessionsColumn;
 pub use app_tests_schema::Column as TestsColumn;
+pub use app_user_answers_schema::Column as TestAnswersColumn;
 pub use app_users_schema::Column as UsersColumn;
 
 pub use app_options_schema::Relation as OptionsRelation;
@@ -24,6 +25,7 @@ pub use app_roles_permissions_schema::Relation as RolesPermissionsRelation;
 pub use app_roles_schema::Relation as RolesRelation;
 pub use app_test_sessions_schema::Relation as TestSessionsRelation;
 pub use app_tests_schema::Relation as TestsRelation;
+pub use app_user_answers_schema::Relation as TestAnswersRelation;
 pub use app_users_schema::Relation as UsersRelation;
 
 pub use app_options_schema::Entity as OptionsEntity;
@@ -33,6 +35,7 @@ pub use app_roles_permissions_schema::Entity as RolesPermissionsEntity;
 pub use app_roles_schema::Entity as RolesEntity;
 pub use app_test_sessions_schema::Entity as TestSessionsEntity;
 pub use app_tests_schema::Entity as TestsEntity;
+pub use app_user_answers_schema::Entity as TestAnswersEntity;
 pub use app_users_schema::Entity as UsersEntity;
 
 pub use app_options_schema::Model as OptionsModel;
@@ -42,6 +45,7 @@ pub use app_roles_permissions_schema::Model as RolesPermissionsModel;
 pub use app_roles_schema::Model as RolesModel;
 pub use app_test_sessions_schema::Model as TestSessionsModel;
 pub use app_tests_schema::Model as TestsModel;
+pub use app_user_answers_schema::Model as TestAnswersModel;
 pub use app_users_schema::Model as UsersModel;
 
 pub use app_options_schema::ActiveModel as OptionsActiveModel;
@@ -51,4 +55,5 @@ pub use app_roles_permissions_schema::ActiveModel as RolesPermissionsActiveModel
 pub use app_roles_schema::ActiveModel as RolesActiveModel;
 pub use app_test_sessions_schema::ActiveModel as TestSessionsActiveModel;
 pub use app_tests_schema::ActiveModel as TestsActiveModel;
+pub use app_user_answers_schema::ActiveModel as TestAnswersActiveModel;
 pub use app_users_schema::ActiveModel as UsersActiveModel;

@@ -1,9 +1,13 @@
-pub mod schemas;
+use crate::Config;
 use log::{error, info};
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::time::Duration;
 
-use crate::Config;
+pub mod schemas;
+pub mod seeders;
+
+pub use schemas::*;
+pub use seeders::*;
 
 pub async fn get_db() -> DatabaseConnection {
 	let config = Config::new();
