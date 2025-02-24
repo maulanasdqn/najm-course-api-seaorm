@@ -1,9 +1,7 @@
 pub mod v1;
 
-use crate::{
-	utils::dto::{MessageResponseDto, MetaRequestDto, MetaResponseDto},
-	ResponseSuccessDto, ResponseSuccessListDto,
-};
+use crate::Config;
+
 use axum::{
 	http::{header, HeaderValue, Method},
 	middleware::from_fn,
@@ -11,176 +9,16 @@ use axum::{
 	routing::get,
 	Router,
 };
-use std::env;
+
 use tower_http::cors::CorsLayer;
-use utoipa::{
-	openapi::security::{Http, HttpAuthScheme, SecurityScheme},
-	Modify, OpenApi,
-};
 use utoipa_swagger_ui::SwaggerUi;
-use v1::{
-	AuthChangePasswordRequestDto, AuthDataDto, AuthForgotRequestDto,
-	AuthLoginRequestDto, AuthNewPasswordRequestDto, AuthRefreshTokenRequestDto,
-	AuthRegisterRequestDto, AuthTokenItemDto, AuthVerifyEmailRequestDto,
-	OptionsItemDto, PermissionsItemDto, PermissionsRequestDto, QuestionsItemDto,
-	RolesItemDto, RolesItemListDto, RolesRequestCreateDto, RolesRequestUpdateDto,
-	SessionsItemDto, SessionsItemListDto, SessionsRequestCreateDto,
-	SessionsRequestUpdateDto, StorageRequestDto, StorageResponseDto, TestsItemDto,
-	TestsItemListDto, TestsRequestCreateDto, TestsRequestUpdateDto,
-	UsersActiveInactiveRequestDto, UsersCreateRequestDto, UsersItemDto,
-	UsersItemListDto, UsersUpdateRequestDto,
-};
 
 pub async fn root_routes() -> Router {
-	#[derive(OpenApi)]
-	#[openapi(
-        paths(
-            v1::auth::auth_controller::post_login,
-            v1::auth::auth_controller::post_register,
-            v1::auth::auth_controller::post_forgot,
-            v1::auth::auth_controller::post_verify_email,
-            v1::auth::auth_controller::post_send_otp,
-            v1::auth::auth_controller::post_new_password,
-            v1::auth::auth_controller::post_change_password,
-            v1::auth::auth_controller::post_refresh,
+	let config = Config::new();
 
-            v1::users::users_controller::get_users,
-            v1::users::users_controller::get_detail_user,
-            v1::users::users_controller::get_user_me,
-            v1::users::users_controller::put_update_user_me,
-            v1::users::users_controller::post_create_user,
-            v1::users::users_controller::put_update_user,
-            v1::users::users_controller::put_activate_user,
-            v1::users::users_controller::delete_user,
-
-            v1::roles::roles_controller::get_roles,
-            v1::roles::roles_controller::get_detail_role,
-            v1::roles::roles_controller::post_create_role,
-            v1::roles::roles_controller::put_update_role,
-            v1::roles::roles_controller::delete_role,
-
-            v1::permissions::permissions_controller::get_permissions,
-            v1::permissions::permissions_controller::get_detail_permission,
-            v1::permissions::permissions_controller::post_create_permission,
-            v1::permissions::permissions_controller::put_update_permission,
-            v1::permissions::permissions_controller::delete_permission,
-
-            v1::sessions::sessions_controller::get_sessions,
-            v1::sessions::sessions_controller::get_detail_session,
-            v1::sessions::sessions_controller::post_create_session,
-            v1::sessions::sessions_controller::put_update_session,
-            v1::sessions::sessions_controller::delete_session,
-
-            v1::tests::tests_controller::get_tests,
-            v1::tests::tests_controller::get_detail_test,
-            v1::tests::tests_controller::post_create_test,
-            v1::tests::tests_controller::put_update_test,
-            v1::tests::tests_controller::delete_test,
-
-            v1::storage::storage_controller::post_upload,
-
-        ),
-        components(
-            schemas(
-                MetaRequestDto,
-                MetaResponseDto,
-                MessageResponseDto,
-
-                ResponseSuccessDto<AuthTokenItemDto>,
-                ResponseSuccessDto<AuthDataDto>,
-
-                ResponseSuccessDto<UsersItemDto>,
-                ResponseSuccessListDto<UsersItemListDto>,
-
-                ResponseSuccessListDto<RolesItemListDto>,
-                ResponseSuccessDto<RolesItemDto>,
-
-                ResponseSuccessListDto<PermissionsItemDto>,
-                ResponseSuccessDto<PermissionsItemDto>,
-
-                ResponseSuccessListDto<SessionsItemListDto>,
-                ResponseSuccessDto<SessionsItemDto>,
-
-                ResponseSuccessListDto<TestsItemListDto>,
-                ResponseSuccessDto<TestsItemDto>,
-
-                ResponseSuccessDto<StorageResponseDto>,
-
-                StorageRequestDto,
-                StorageResponseDto,
-
-                AuthLoginRequestDto,
-                AuthRegisterRequestDto,
-                AuthTokenItemDto,
-                AuthDataDto,
-                AuthForgotRequestDto,
-                AuthVerifyEmailRequestDto,
-                AuthNewPasswordRequestDto,
-                AuthChangePasswordRequestDto,
-                AuthRefreshTokenRequestDto,
-
-                UsersCreateRequestDto,
-                UsersActiveInactiveRequestDto,
-                UsersUpdateRequestDto,
-                UsersItemDto,
-
-                RolesItemDto,
-                RolesItemListDto,
-                RolesRequestCreateDto,
-                RolesRequestUpdateDto,
-
-                PermissionsItemDto,
-                PermissionsRequestDto,
-
-                SessionsItemDto,
-                SessionsItemListDto,
-                SessionsRequestCreateDto,
-                SessionsRequestUpdateDto,
-
-                TestsItemDto,
-                TestsItemListDto,
-                TestsRequestCreateDto,
-                TestsRequestUpdateDto,
-                QuestionsItemDto,
-                OptionsItemDto,
-            )
-        ),
-        info(
-            title = "Najm Course API",
-            description = "Najm Course API Documentation",
-            version = "0.1.0",
-            contact(
-                name = "Maulana Sodiqin",
-                url = ""
-            ),
-            license(
-                name = "MIT",
-                url = "https://opensource.org/licenses/MIT",
-            )
-        ),
-        modifiers(&SecurityAddon),
-        tags(
-            (name = "Authentication", description = "Authentication Endpoint"),
-        )
-    )]
-	struct ApiDoc;
-
-	struct SecurityAddon;
-
-	impl Modify for SecurityAddon {
-		fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-			if let Some(components) = openapi.components.as_mut() {
-				components.add_security_scheme(
-					"Bearer",
-					SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
-				);
-			}
-		}
-	}
-
-	let cors_origins = match env::var("RUST_ENV").as_deref() {
-		Ok("development") => vec!["http://localhost:5173"],
-		Ok("production") => {
+	let cors_origins = match config.rust_env.as_str() {
+		"development" => vec!["http://localhost:5173"],
+		"production" => {
 			vec!["https://najmcourse.com", "https://cat.najmcourse.com"]
 		}
 		_ => vec![
@@ -216,12 +54,12 @@ pub async fn root_routes() -> Router {
 		.merge(v1_public_routes)
 		.merge(v1_protected_routes);
 
-	let v2_routes = Router::new().route("/", get(|| async { "Comming Soon" }));
+	let v2_routes = Router::new().route("/", get(|| async { "Coming Soon" }));
 
 	Router::new()
 		.route("/", get(Redirect::to("/docs")))
 		.nest("/v1", v1_routes)
 		.nest("/v2", v2_routes)
-		.merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+		.merge(SwaggerUi::new("/docs").url("/openapi.json", v1::docs::docs_router()))
 		.layer(cors_middleware)
 }
