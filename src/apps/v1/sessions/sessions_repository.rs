@@ -97,6 +97,7 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 				SessionsItemListDto {
 					id: session.id.to_string(),
 					session_name: session.session_name,
+					student_type: session.student_type,
 					start_date: session.start_date.to_string(),
 					end_date: session.end_date.to_string(),
 					test_count,
@@ -175,6 +176,7 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 	let session_dto = SessionsItemDto {
 		id: session.id.to_string(),
 		session_name: session.session_name,
+		student_type: session.student_type,
 		start_date: session.start_date.to_string(),
 		end_date: session.end_date.to_string(),
 		tests: tests_dto,

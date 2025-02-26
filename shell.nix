@@ -22,6 +22,8 @@ pkgs.mkShell {
         - start:            start project in production 🛹 ( need to run build first )
         - build:            build project for production
         - dev:              start project in development
+        - seed:             seeding database
+        - migrate:          migrate database
         - start-docker:     start project in docker container ( compose )
         - build-docker:     build project for docker container
         - helpme:           show this messages

@@ -8,6 +8,7 @@ pub struct Model {
 	#[sea_orm(primary_key)]
 	pub id: Uuid,
 	pub session_name: String,
+	pub student_type: Option<String>,
 	pub start_date: DateTimeUtc,
 	pub end_date: DateTimeUtc,
 	pub created_at: Option<DateTimeUtc>,
