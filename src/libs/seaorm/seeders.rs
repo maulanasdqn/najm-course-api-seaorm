@@ -141,8 +141,8 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 			id: Set(session_id),
 			session_name: Set(session_name.to_owned()),
 			student_type: Set(Some("tni".to_string())),
-			start_date: Set(Utc::now()),
-			end_date: Set(Utc::now()),
+			description: Set("Lorem ipsum".to_string()),
+			is_active: Set(false),
 			created_at: Set(Some(Utc::now())),
 			updated_at: Set(Some(Utc::now())),
 		};

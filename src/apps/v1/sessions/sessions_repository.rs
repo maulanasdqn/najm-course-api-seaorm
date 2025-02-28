@@ -51,10 +51,6 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 		("session_name", "desc") => {
 			query.order_by_desc(TestSessionsColumn::SessionName)
 		}
-		("start_date", "asc") => query.order_by_asc(TestSessionsColumn::StartDate),
-		("start_date", "desc") => query.order_by_desc(TestSessionsColumn::StartDate),
-		("end_date", "asc") => query.order_by_asc(TestSessionsColumn::EndDate),
-		("end_date", "desc") => query.order_by_desc(TestSessionsColumn::EndDate),
 		("created_at", "asc") => query.order_by_asc(TestSessionsColumn::CreatedAt),
 		("created_at", "desc") => query.order_by_desc(TestSessionsColumn::CreatedAt),
 		("updated_at", "asc") => query.order_by_asc(TestSessionsColumn::UpdatedAt),
@@ -98,8 +94,8 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 					id: session.id.to_string(),
 					session_name: session.session_name,
 					student_type: session.student_type,
-					start_date: session.start_date.to_string(),
-					end_date: session.end_date.to_string(),
+					description: session.description,
+					is_active: session.is_active,
 					test_count,
 					created_at: session.created_at.map(|dt| dt.to_string()),
 					updated_at: session.updated_at.map(|dt| dt.to_string()),
@@ -177,8 +173,8 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		id: session.id.to_string(),
 		session_name: session.session_name,
 		student_type: session.student_type,
-		start_date: session.start_date.to_string(),
-		end_date: session.end_date.to_string(),
+		description: session.description,
+		is_active: session.is_active,
 		tests: tests_dto,
 		created_at: session.created_at.map(|dt| dt.to_string()),
 		updated_at: session.updated_at.map(|dt| dt.to_string()),
@@ -196,8 +192,8 @@ pub async fn mutation_create_session(
 	let new_session = TestSessionsActiveModel {
 		id: Set(Uuid::new_v4()),
 		session_name: Set(payload.session_name.clone()),
-		start_date: Set(payload.start_date.parse().unwrap_or_else(|_| Utc::now())),
-		end_date: Set(payload.end_date.parse().unwrap_or_else(|_| Utc::now())),
+		description: Set(payload.description.clone()),
+		is_active: Set(payload.is_active),
 		created_at: Set(Some(Utc::now())),
 		updated_at: Set(Some(Utc::now())),
 		..Default::default()
@@ -248,16 +244,20 @@ pub async fn mutation_update_session(
 
 	let mut active_model: TestSessionsActiveModel = session.into();
 
-	if let Some(session_name) = &payload.session_name {
-		active_model.session_name = Set(session_name.clone());
+	if payload.session_name != "" {
+		active_model.session_name = Set(payload.session_name.clone());
 	}
-	if let Some(start_date) = &payload.start_date {
-		active_model.start_date =
-			Set(start_date.parse().unwrap_or_else(|_| Utc::now()));
+
+	if payload.student_type != "" {
+		active_model.student_type = Set(Some(payload.student_type.clone()));
 	}
-	if let Some(end_date) = &payload.end_date {
-		active_model.end_date = Set(end_date.parse().unwrap_or_else(|_| Utc::now()));
+
+	if payload.description != "" {
+		active_model.description = Set(payload.description.clone());
 	}
+
+	active_model.is_active = Set(payload.is_active);
+
 	active_model.updated_at = Set(Some(Utc::now()));
 
 	match active_model.update(&db).await {
