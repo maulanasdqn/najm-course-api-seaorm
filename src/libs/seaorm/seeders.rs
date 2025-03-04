@@ -9,6 +9,7 @@ use super::schemas::{
 	app_options_schema as options, app_permissions_schema as permissions,
 	app_questions_schema as questions,
 	app_roles_permissions_schema as roles_permissions, app_roles_schema as roles,
+	app_sessions_has_tests_schema as sessions_has_tests,
 	app_test_sessions_schema as test_sessions, app_tests_schema as tests,
 	app_users_schema as users,
 };
@@ -107,9 +108,9 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 			.await?
 		{
 			println!(
-				"Role-Permission mapping for admin and permission {} already exists. Skipping.",
-				perm_id
-			);
+                "Role-Permission mapping for admin and permission {} already exists. Skipping.",
+                perm_id
+            );
 			continue;
 		}
 		let role_permission = roles_permissions::ActiveModel {
@@ -166,12 +167,14 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 			existing
 		} else {
 			let test_id = Uuid::new_v4();
+
 			let new_test = tests::ActiveModel {
 				id: Set(test_id),
 				test_name: Set(test_name.clone()),
-				session_id: Set(session.id),
 				created_at: Set(Some(Utc::now())),
 				updated_at: Set(Some(Utc::now())),
+				// If your model has other fields, set them accordingly.
+				..Default::default()
 			};
 			tests::Entity::insert(new_test).exec(db).await?;
 			println!("Inserted test '{}'.", test_name);
@@ -180,6 +183,37 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 				.await?
 				.expect("Test should be inserted")
 		};
+
+		println!(
+			"Linking test '{}' with session '{}'",
+			test_name, session.session_name
+		);
+		if let Some(_) = sessions_has_tests::Entity::find()
+			.filter(sessions_has_tests::Column::SessionId.eq(session.id))
+			.filter(sessions_has_tests::Column::TestId.eq(test_entity.id))
+			.one(db)
+			.await?
+		{
+			println!(
+				"Link between session '{}' and test '{}' already exists. Skipping.",
+				session.session_name, test_name
+			);
+		} else {
+			let link = sessions_has_tests::ActiveModel {
+				id: Set(Uuid::new_v4()),
+				session_id: Set(session.id),
+				test_id: Set(test_entity.id),
+				start_date: Set(Some(Utc::now())),
+				end_date: Set(None),
+				weight: Set(Some(1.2)),
+				multiplier: Set(Some(1.2)),
+			};
+			sessions_has_tests::Entity::insert(link).exec(db).await?;
+			println!(
+				"Created link between session '{}' and test '{}'.",
+				session.session_name, test_name
+			);
+		}
 
 		for question_number in 1..=20 {
 			let question_text =

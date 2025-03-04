@@ -186,7 +186,7 @@ pub async fn post_create_test_answer(
 ) -> impl IntoResponse {
 	match permissions_middleware(&headers, vec![PermissionsEnum::CreateTests]).await
 	{
-		Ok(_) => mutation_create_test_answer(Json(payload)).await,
+		Ok(_) => mutation_create_test_answer(headers, Json(payload)).await,
 		Err(response) => response,
 	}
 }

@@ -3,15 +3,17 @@ use chrono::Utc;
 use futures::future::join_all;
 use sea_orm::{
 	prelude::*, sea_query::extension::postgres::PgExpr, ActiveModelTrait,
-	ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait,
-	QueryFilter, QueryOrder, Set,
+	ColumnTrait, DatabaseConnection, EntityTrait, JoinType, ModelTrait,
+	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use uuid::Uuid;
 
 use crate::{
 	common_response, get_db,
 	schemas::{
-		TestSessionsActiveModel, TestSessionsColumn, TestSessionsEntity, TestsEntity,
+		app_sessions_has_tests_schema as sessions_has_tests,
+		TestSessionsActiveModel, TestSessionsColumn, TestSessionsEntity,
+		TestsEntity,
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
 	QuestionsColumn, QuestionsEntity, ResponseSuccessDto, ResponseSuccessListDto,
@@ -81,11 +83,11 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 	};
 
 	let data: Vec<SessionsItemListDto> =
-		futures::future::join_all(sessions.into_iter().map(|session| {
+		join_all(sessions.into_iter().map(|session| {
 			let db = db.clone();
 			async move {
-				let test_count = TestsEntity::find()
-					.filter(crate::schemas::TestsColumn::SessionId.eq(session.id))
+				let test_count = sessions_has_tests::Entity::find()
+					.filter(sessions_has_tests::Column::SessionId.eq(session.id))
 					.count(&db)
 					.await
 					.unwrap_or(0);
@@ -137,7 +139,11 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 	};
 
 	let tests_entities = match TestsEntity::find()
-		.filter(crate::schemas::TestsColumn::SessionId.eq(session.id))
+		.join(
+			JoinType::InnerJoin,
+			sessions_has_tests::Relation::Test.def(),
+		)
+		.filter(sessions_has_tests::Column::SessionId.eq(session.id))
 		.all(&db)
 		.await
 	{
@@ -196,11 +202,56 @@ pub async fn mutation_create_session(
 		is_active: Set(payload.is_active),
 		created_at: Set(Some(Utc::now())),
 		updated_at: Set(Some(Utc::now())),
+		student_type: Set(payload.student_type.clone()),
 		..Default::default()
 	};
 
-	match new_session.insert(&db).await {
-		Ok(_session) => {
+	let session_result = new_session.insert(&db).await;
+
+	match session_result {
+		Ok(inserted_session) => {
+			for test_dto in payload.tests.iter() {
+				let test_id = match Uuid::parse_str(&test_dto.test_id) {
+					Ok(id) => id,
+					Err(_) => {
+						return common_response(
+							StatusCode::BAD_REQUEST,
+							"Invalid test_id format",
+						);
+					}
+				};
+
+				let start_date = chrono::NaiveDateTime::parse_from_str(
+					&test_dto.start_date,
+					"%Y-%m-%dT%H:%M:%S",
+				)
+				.ok()
+				.map(|dt| dt.and_local_timezone(Utc).unwrap());
+				let end_date = chrono::NaiveDateTime::parse_from_str(
+					&test_dto.end_date,
+					"%Y-%m-%dT%H:%M:%S",
+				)
+				.ok()
+				.map(|dt| dt.and_local_timezone(Utc).unwrap());
+
+				let join_record = sessions_has_tests::ActiveModel {
+					id: Set(Uuid::new_v4()),
+					session_id: Set(inserted_session.id),
+					test_id: Set(test_id),
+					start_date: Set(start_date),
+					end_date: Set(end_date),
+					weight: Set(Some(test_dto.weight)),
+					multiplier: Set(Some(test_dto.multiplier)),
+				};
+
+				if let Err(e) = join_record.insert(&db).await {
+					return common_response(
+						StatusCode::INTERNAL_SERVER_ERROR,
+						&e.to_string(),
+					);
+				}
+			}
+
 			common_response(StatusCode::CREATED, "Session created successfully")
 		}
 		Err(err) => {
@@ -257,7 +308,6 @@ pub async fn mutation_update_session(
 	}
 
 	active_model.is_active = Set(payload.is_active);
-
 	active_model.updated_at = Set(Some(Utc::now()));
 
 	match active_model.update(&db).await {

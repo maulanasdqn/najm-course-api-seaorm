@@ -6,18 +6,18 @@ pub struct TestAnswersItemDto {
 	pub id: String,
 	pub user_id: String,
 	pub test_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct QuestionsAnswersRequestCreateDto {
 	pub question_id: String,
-	pub option_id: Option<String>,
-	pub answer: Option<String>,
+	pub option_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TestAnswersRequestCreateDto {
-	pub user_id: String,
 	pub test_id: String,
-	pub question_id: String,
-	pub option_id: Option<String>,
-	pub answer: Option<String>,
+	pub questions: Vec<QuestionsAnswersRequestCreateDto>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -55,7 +55,6 @@ pub struct TestsRequestUpdateDto {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct TestsRequestCreateDto {
 	pub test_name: String,
-	pub session_id: String,
 	pub questions: Vec<QuestionsRequestCreateDto>,
 }
 
@@ -72,7 +71,6 @@ pub struct TestsItemListDto {
 pub struct TestsItemDto {
 	pub id: String,
 	pub test_name: String,
-	pub session_id: String,
 	pub questions: Vec<QuestionsItemDto>,
 	pub created_at: Option<String>,
 	pub updated_at: Option<String>,

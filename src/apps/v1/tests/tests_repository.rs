@@ -1,6 +1,7 @@
 use axum::{http::StatusCode, response::Response, Json};
 use chrono::Utc;
 use futures::future::join_all;
+use hyper::HeaderMap;
 use sea_orm::{
 	prelude::*, sea_query::extension::postgres::PgExpr, ActiveModelTrait,
 	ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait,
@@ -9,7 +10,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::{
-	common_response, get_db,
+	common_response, decode_access_token, get_db,
 	schemas::{
 		OptionsActiveModel, OptionsColumn, OptionsEntity, QuestionsActiveModel,
 		QuestionsColumn, QuestionsEntity, TestsActiveModel, TestsColumn,
@@ -17,7 +18,7 @@ use crate::{
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
 	ResponseSuccessDto, ResponseSuccessListDto, TestAnswersActiveModel,
-	TestAnswersColumn, TestAnswersEntity,
+	TestAnswersColumn, TestAnswersEntity, UsersColumn, UsersEntity,
 };
 
 use super::{
@@ -165,7 +166,6 @@ pub async fn query_get_test_by_id(id: String) -> Response {
 	let test_dto = TestsItemDto {
 		id: test.id.to_string(),
 		test_name: test.test_name,
-		session_id: test.session_id.to_string(),
 		questions: questions_dto,
 		created_at: test.created_at.map(|dt| dt.to_string()),
 		updated_at: test.updated_at.map(|dt| dt.to_string()),
@@ -181,7 +181,6 @@ pub async fn mutation_create_test(payload: Json<TestsRequestCreateDto>) -> Respo
 	let new_test = TestsActiveModel {
 		id: Set(Uuid::new_v4()),
 		test_name: Set(payload.test_name.clone()),
-		session_id: Set(Uuid::parse_str(&payload.session_id).unwrap_or_default()),
 		created_at: Set(Some(Utc::now())),
 		updated_at: Set(Some(Utc::now())),
 		..Default::default()
@@ -342,9 +341,6 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 		id: answer.id.to_string(),
 		user_id: answer.user_id.to_string(),
 		test_id: answer.test_id.to_string(),
-		question_id: answer.question_id.to_string(),
-		option_id: answer.option_id.map(|id| id.to_string()),
-		answer: answer.answer,
 	};
 
 	let response = ResponseSuccessDto { data: dto };
@@ -352,20 +348,61 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 }
 
 pub async fn mutation_create_test_answer(
+	headers: HeaderMap,
 	payload: Json<TestAnswersRequestCreateDto>,
 ) -> Response {
 	let db: DatabaseConnection = get_db().await;
 
+	let auth_header = match headers.get("Authorization") {
+		Some(header) => header.to_str(),
+		None => {
+			return common_response(StatusCode::FORBIDDEN, "You are not authorized")
+		}
+	};
+
+	let auth_header = match auth_header {
+		Ok(header) => header,
+		Err(err) => {
+			return common_response(StatusCode::BAD_REQUEST, &err.to_string())
+		}
+	};
+
+	let mut header_parts = auth_header.split_whitespace();
+	let token = match header_parts.nth(1) {
+		Some(token) => token,
+		None => {
+			return common_response(StatusCode::BAD_REQUEST, "Invalid token format")
+		}
+	};
+
+	let token_data = match decode_access_token(&token) {
+		Ok(data) => data,
+		Err(err) => {
+			return common_response(StatusCode::UNAUTHORIZED, &err.to_string())
+		}
+	};
+
+	let email = token_data.claims.email;
+
+	let user = match UsersEntity::find()
+		.filter(UsersColumn::Email.eq(email))
+		.one(&db)
+		.await
+	{
+		Ok(Some(user)) => user,
+		Ok(None) => return common_response(StatusCode::NOT_FOUND, "User not found"),
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
 	let new_answer = TestAnswersActiveModel {
 		id: Set(Uuid::new_v4()),
-		user_id: Set(Uuid::parse_str(&payload.user_id).unwrap_or_default()),
+		user_id: Set(user.id), // user.id is already a Uuid
 		test_id: Set(Uuid::parse_str(&payload.test_id).unwrap_or_default()),
-		question_id: Set(Uuid::parse_str(&payload.question_id).unwrap_or_default()),
-		option_id: Set(payload
-			.option_id
-			.as_ref()
-			.and_then(|s| Uuid::parse_str(s).ok())),
-		answer: Set(payload.answer.clone()),
 		..Default::default()
 	};
 
@@ -383,9 +420,6 @@ pub async fn mutation_create_test_answer(
 		id: answer.id.to_string(),
 		user_id: answer.user_id.to_string(),
 		test_id: answer.test_id.to_string(),
-		question_id: answer.question_id.to_string(),
-		option_id: answer.option_id.map(|id| id.to_string()),
-		answer: answer.answer,
 	};
 
 	let response = ResponseSuccessDto { data: dto };

@@ -1,3 +1,4 @@
+use super::app_sessions_has_tests_schema::Relation;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -15,20 +16,10 @@ pub struct Model {
 	pub updated_at: Option<DateTimeUtc>,
 }
 
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-	#[sea_orm(
-		has_many = "super::app_tests_schema::Entity",
-		from = "Column::Id",
-		to = "super::app_tests_schema::Column::SessionId"
-	)]
-	Tests,
-}
+impl ActiveModelBehavior for ActiveModel {}
 
-impl Related<super::app_tests_schema::Entity> for Entity {
+impl Related<crate::app_sessions_has_tests_schema::Entity> for Entity {
 	fn to() -> RelationDef {
-		Relation::Tests.def()
+		Relation::Session.def()
 	}
 }
-
-impl ActiveModelBehavior for ActiveModel {}

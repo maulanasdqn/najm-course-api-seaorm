@@ -1,7 +1,15 @@
+use crate::TestsItemListDto;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::TestsItemListDto;
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SessionsTestDto {
+	pub start_date: String,
+	pub end_date: String,
+	pub test_id: String,
+	pub weight: f64,
+	pub multiplier: f64,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SessionsRequestUpdateDto {
@@ -9,6 +17,7 @@ pub struct SessionsRequestUpdateDto {
 	pub student_type: String,
 	pub is_active: bool,
 	pub description: String,
+	pub tests: Vec<SessionsTestDto>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -17,6 +26,7 @@ pub struct SessionsRequestCreateDto {
 	pub student_type: Option<String>,
 	pub is_active: bool,
 	pub description: String,
+	pub tests: Vec<SessionsTestDto>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
