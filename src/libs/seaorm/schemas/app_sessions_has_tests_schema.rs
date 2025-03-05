@@ -11,8 +11,8 @@ pub struct Model {
 	pub test_id: Uuid,
 	pub start_date: Option<DateTimeUtc>,
 	pub end_date: Option<DateTimeUtc>,
-	pub weight: Option<f64>,
-	pub multiplier: Option<f64>,
+	pub weight: Option<String>,
+	pub multiplier: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

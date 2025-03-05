@@ -401,7 +401,7 @@ pub async fn mutation_create_test_answer(
 
 	let new_answer = TestAnswersActiveModel {
 		id: Set(Uuid::new_v4()),
-		user_id: Set(user.id), // user.id is already a Uuid
+		user_id: Set(user.id),
 		test_id: Set(Uuid::parse_str(&payload.test_id).unwrap_or_default()),
 		..Default::default()
 	};

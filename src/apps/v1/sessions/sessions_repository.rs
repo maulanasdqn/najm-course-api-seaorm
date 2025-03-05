@@ -240,8 +240,8 @@ pub async fn mutation_create_session(
 					test_id: Set(test_id),
 					start_date: Set(start_date),
 					end_date: Set(end_date),
-					weight: Set(Some(test_dto.weight)),
-					multiplier: Set(Some(test_dto.multiplier)),
+					weight: Set(Some(test_dto.weight.to_string())),
+					multiplier: Set(Some(test_dto.multiplier.to_string())),
 				};
 
 				if let Err(e) = join_record.insert(&db).await {

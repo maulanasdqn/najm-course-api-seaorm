@@ -7,8 +7,8 @@ pub struct SessionsTestDto {
 	pub start_date: String,
 	pub end_date: String,
 	pub test_id: String,
-	pub weight: f64,
-	pub multiplier: f64,
+	pub weight: String,
+	pub multiplier: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

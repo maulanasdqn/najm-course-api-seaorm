@@ -205,8 +205,8 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 				test_id: Set(test_entity.id),
 				start_date: Set(Some(Utc::now())),
 				end_date: Set(None),
-				weight: Set(Some(1.2)),
-				multiplier: Set(Some(1.2)),
+				weight: Set(Some("3".to_string())),
+				multiplier: Set(Some("1.5".to_string())),
 			};
 			sessions_has_tests::Entity::insert(link).exec(db).await?;
 			println!(
