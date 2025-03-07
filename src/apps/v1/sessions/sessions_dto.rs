@@ -16,6 +16,7 @@ pub struct SessionsRequestUpdateDto {
 	pub session_name: String,
 	pub student_type: String,
 	pub is_active: bool,
+	pub category: String,
 	pub description: String,
 	pub tests: Vec<SessionsTestDto>,
 }
@@ -25,6 +26,7 @@ pub struct SessionsRequestCreateDto {
 	pub session_name: String,
 	pub student_type: Option<String>,
 	pub is_active: bool,
+	pub category: String,
 	pub description: String,
 	pub tests: Vec<SessionsTestDto>,
 }
@@ -34,6 +36,7 @@ pub struct SessionsItemListDto {
 	pub id: String,
 	pub session_name: String,
 	pub student_type: Option<String>,
+	pub category: String,
 	pub is_active: bool,
 	pub description: String,
 	pub test_count: u64,
@@ -47,6 +50,7 @@ pub struct SessionsItemDto {
 	pub session_name: String,
 	pub student_type: Option<String>,
 	pub is_active: bool,
+	pub category: String,
 	pub description: String,
 	pub tests: Vec<TestsItemListDto>,
 	pub created_at: Option<String>,

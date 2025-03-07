@@ -98,6 +98,7 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 					student_type: session.student_type,
 					description: session.description,
 					is_active: session.is_active,
+					category: "General".to_string(),
 					test_count,
 					created_at: session.created_at.map(|dt| dt.to_string()),
 					updated_at: session.updated_at.map(|dt| dt.to_string()),
@@ -179,6 +180,7 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		id: session.id.to_string(),
 		session_name: session.session_name,
 		student_type: session.student_type,
+		category: "General".to_string(),
 		description: session.description,
 		is_active: session.is_active,
 		tests: tests_dto,
@@ -199,6 +201,7 @@ pub async fn mutation_create_session(
 		id: Set(Uuid::new_v4()),
 		session_name: Set(payload.session_name.clone()),
 		description: Set(payload.description.clone()),
+		category: Set(payload.category.clone()),
 		is_active: Set(payload.is_active),
 		created_at: Set(Some(Utc::now())),
 		updated_at: Set(Some(Utc::now())),
@@ -297,6 +300,10 @@ pub async fn mutation_update_session(
 
 	if payload.session_name != "" {
 		active_model.session_name = Set(payload.session_name.clone());
+	}
+
+	if payload.category != "" {
+		active_model.category = Set(payload.category.clone());
 	}
 
 	if payload.student_type != "" {

@@ -11,6 +11,7 @@ pub struct Model {
 	pub session_name: String,
 	pub is_active: bool,
 	pub description: String,
+	pub category: String,
 	pub student_type: Option<String>,
 	pub created_at: Option<DateTimeUtc>,
 	pub updated_at: Option<DateTimeUtc>,

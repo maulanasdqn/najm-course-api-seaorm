@@ -141,6 +141,7 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 		let new_session = test_sessions::ActiveModel {
 			id: Set(session_id),
 			session_name: Set(session_name.to_owned()),
+			category: Set("General".to_owned()),
 			student_type: Set(Some("tni".to_string())),
 			description: Set("Lorem ipsum".to_string()),
 			is_active: Set(false),
