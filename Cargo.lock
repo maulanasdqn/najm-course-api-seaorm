@@ -3691,10 +3691,12 @@ dependencies = [
  "bitflags",
  "bytes",
  "http",
+ "http-body",
  "mime",
  "pin-project-lite",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

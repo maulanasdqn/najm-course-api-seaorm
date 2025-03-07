@@ -219,6 +219,7 @@ pub async fn mutation_create_test(payload: Json<TestsRequestCreateDto>) -> Respo
 			let new_option = OptionsActiveModel {
 				id: Set(Uuid::new_v4()),
 				question_id: Set(inserted_question.id),
+				is_correct: Set(option.is_correct),
 				label: Set(option.label.clone()),
 				..Default::default()
 			};
