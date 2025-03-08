@@ -5,6 +5,7 @@ pub struct Config {
 	pub access_token_secret: String,
 	pub refresh_token_secret: String,
 	pub database_url: String,
+	pub database_schema: String,
 	pub smtp_email: String,
 	pub smtp_password: String,
 	pub smtp_name: String,
@@ -27,6 +28,8 @@ impl Config {
 				.unwrap_or("default_refresh_secret".to_string()),
 			database_url: env::var("DATABASE_URL")
 				.unwrap_or("postgres://localhost".to_string()),
+			database_schema: env::var("DATABASE_SCHEMA")
+				.unwrap_or("public".to_string()),
 			smtp_email: env::var("SMTP_EMAIL")
 				.unwrap_or("no-reply@example.com".to_string()),
 			smtp_password: env::var("SMTP_PASSWORD")
@@ -49,11 +52,12 @@ impl Config {
 
 	pub fn format(&self) -> String {
 		format!(
-            "Port: {}\nAccess Token Secret: {}\nRefresh Token Secret: {}\nDatabase URL: {}\nSMTP Email: {}\nSMTP Password: {}\nSMTP Name: {}\nRedis Hostname: {}\nFE URL: {}\nRust Env: {}\nMinio Endpoint: {}\nMinio Bucket Name: {}\nMinio Access Key: {}\nMinio Secret Key: {}",
+            "Port: {}\nAccess Token Secret: {}\nRefresh Token Secret: {}\nDatabase URL: {}\nDatabase Schema: {}\nSMTP Email: {}\nSMTP Password: {}\nSMTP Name: {}\nRedis Hostname: {}\nFE URL: {}\nRust Env: {}\nMinio Endpoint: {}\nMinio Bucket Name: {}\nMinio Access Key: {}\nMinio Secret Key: {}",
             self.port,
             self.access_token_secret,
             self.refresh_token_secret,
             self.database_url,
+			self.database_schema,
             self.smtp_email,
             self.smtp_password,
             self.smtp_name,

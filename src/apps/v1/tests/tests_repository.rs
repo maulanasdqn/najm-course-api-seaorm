@@ -4,8 +4,8 @@ use futures::future::join_all;
 use hyper::HeaderMap;
 use sea_orm::{
 	prelude::*, sea_query::extension::postgres::PgExpr, ActiveModelTrait,
-	ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait,
-	QueryFilter, QueryOrder, Set,
+	ColumnTrait, DatabaseConnection, EntityTrait, JoinType, ModelTrait,
+	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use uuid::Uuid;
 
@@ -17,8 +17,9 @@ use crate::{
 		TestsEntity,
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
-	ResponseSuccessDto, ResponseSuccessListDto, TestAnswersActiveModel,
-	TestAnswersColumn, TestAnswersEntity, UsersColumn, UsersEntity,
+	ResponseSuccessDto, ResponseSuccessListDto, SessionsHasTestsColumn,
+	SessionsHasTestsEntity, TestAnswersActiveModel, TestAnswersColumn,
+	TestAnswersEntity, UsersColumn, UsersEntity,
 };
 
 use super::{
@@ -40,12 +41,36 @@ pub async fn query_get_tests(params: MetaRequestDto) -> Response {
 		.unwrap_or("created_at".to_string())
 		.to_lowercase();
 	let order = params.order.unwrap_or("desc".to_string()).to_lowercase();
+	let filter = params.filter.unwrap_or_default();
+	let filter_by = params.filter_by.unwrap_or_default().to_lowercase();
 
 	let mut query = TestsEntity::find();
 
 	if !search.is_empty() {
 		query = query
 			.filter(Expr::col(TestsColumn::TestName).ilike(format!("%{}%", search)));
+	}
+
+	if filter_by == "session_id" && !filter.is_empty() {
+		if let Ok(session_uuid) = Uuid::parse_str(&filter) {
+			query = query
+				.join(
+					JoinType::InnerJoin,
+					<TestsEntity as Related<SessionsHasTestsEntity>>::to(),
+				)
+				.filter(
+					Expr::col((
+						SessionsHasTestsEntity,
+						SessionsHasTestsColumn::SessionId,
+					))
+					.eq(session_uuid),
+				);
+		} else {
+			return common_response(
+				StatusCode::BAD_REQUEST,
+				"Invalid session_id format",
+			);
+		}
 	}
 
 	query = match (sort_by.as_str(), order.as_str()) {
@@ -462,4 +487,88 @@ pub async fn mutation_delete_test_answer(id: String) -> Response {
 			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
 		}
 	}
+}
+
+pub async fn query_test_answer_list(
+	session_id: String,
+	params: MetaRequestDto,
+) -> Response {
+	let db: DatabaseConnection = get_db().await;
+
+	let session_uuid = match Uuid::parse_str(&session_id) {
+		Ok(uuid) => uuid,
+		Err(_) => {
+			return common_response(
+				StatusCode::BAD_REQUEST,
+				"Invalid session_id format",
+			)
+		}
+	};
+
+	let page = params.page.unwrap_or(1).max(1);
+	let per_page = params.per_page.unwrap_or(10).max(1).min(100);
+	let search = params.search.unwrap_or_default().to_lowercase();
+	let sort_by = params.sort_by.unwrap_or("id".to_string()).to_lowercase();
+	let order = params.order.unwrap_or("desc".to_string()).to_lowercase();
+
+	let mut query =
+		TestAnswersEntity::find().filter(TestAnswersColumn::TestId.eq(session_uuid));
+
+	if !search.is_empty() {
+		query = query.filter(
+			Expr::cust("CAST(user_id AS TEXT)").ilike(format!("%{}%", search)),
+		);
+	}
+
+	query = match (sort_by.as_str(), order.as_str()) {
+		("id", "asc") => query.order_by_asc(TestAnswersColumn::Id),
+		("id", "desc") => query.order_by_desc(TestAnswersColumn::Id),
+		("user_id", "asc") => query.order_by_asc(TestAnswersColumn::UserId),
+		("user_id", "desc") => query.order_by_desc(TestAnswersColumn::UserId),
+		("test_id", "asc") => query.order_by_asc(TestAnswersColumn::TestId),
+		("test_id", "desc") => query.order_by_desc(TestAnswersColumn::TestId),
+		_ => query.order_by_desc(TestAnswersColumn::Id),
+	};
+
+	let paginator = query.paginate(&db, per_page);
+
+	let total_items = match paginator.num_items().await {
+		Ok(count) => count,
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let answers = match paginator.fetch_page(page - 1).await {
+		Ok(data) => data,
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	let answers_dto: Vec<_> = answers
+		.into_iter()
+		.map(|answer| TestAnswersItemDto {
+			id: answer.id.to_string(),
+			user_id: answer.user_id.to_string(),
+			test_id: answer.test_id.to_string(),
+		})
+		.collect();
+
+	let response = ResponseSuccessListDto {
+		data: answers_dto,
+		meta: Some(MetaResponseDto {
+			page: Some(page),
+			per_page: Some(per_page),
+			total: Some(total_items),
+		}),
+	};
+
+	success_response_list(response)
 }
