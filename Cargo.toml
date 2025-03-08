@@ -19,7 +19,7 @@ sea-orm-migration = { version = "1.1.0", features = ["sqlx-postgres", "runtime-t
 serde = "1.0.217"
 serde_json = "1.0.134"
 tokio = { version = "1.42.0", features = ["full"] }
-uuid = { version = "1.11.0", features = ["v4"] }
+uuid = { version = "1.11.0", features = ["serde", "v4"] }
 validator = { version = "0.19.0", features = ["derive"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
@@ -36,6 +36,7 @@ minio-rsc = { version = "0.2.3", features = ["ext", "fs-tokio"] }
 bytes = { version = "1.10.0", features = ["serde"] }
 mime_guess = "2.0.5"
 futures = "0.3.31"
+base64 = "0.22.1"
 
 [profile.release]
 lto = "fat"

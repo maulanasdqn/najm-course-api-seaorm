@@ -66,7 +66,7 @@ pub async fn get_detail_test(
 	match permissions_middleware(&headers, vec![PermissionsEnum::ReadDetailTests])
 		.await
 	{
-		Ok(_) => query_get_test_by_id(id).await,
+		Ok(_) => query_get_test_by_id(headers, id).await,
 		Err(response) => response,
 	}
 }

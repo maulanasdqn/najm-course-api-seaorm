@@ -9,6 +9,7 @@ mod m20250304_160308_add_weight_and_multiplier;
 mod m20250304_163253_remove_test_session_id;
 mod m20250305_031240_change_has_session_type;
 mod m20250307_195832_add_category_to_session;
+mod m20250308_154930_user_question_answer;
 
 pub struct Migrator;
 
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
 			Box::new(m20250304_163253_remove_test_session_id::Migration),
 			Box::new(m20250305_031240_change_has_session_type::Migration),
 			Box::new(m20250307_195832_add_category_to_session::Migration),
+			Box::new(m20250308_154930_user_question_answer::Migration),
 		]
 	}
 }

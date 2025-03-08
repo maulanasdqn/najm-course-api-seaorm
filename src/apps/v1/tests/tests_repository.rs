@@ -10,6 +10,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::{
+	app_user_answers_schema, app_user_questions_answers_schema, app_users_schema,
 	common_response, decode_access_token, get_db,
 	schemas::{
 		OptionsActiveModel, OptionsColumn, OptionsEntity, QuestionsActiveModel,
@@ -17,8 +18,8 @@ use crate::{
 		TestsEntity,
 	},
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
-	ResponseSuccessDto, ResponseSuccessListDto, SessionsHasTestsColumn,
-	SessionsHasTestsEntity, TestAnswersActiveModel, TestAnswersColumn,
+	ResponseSuccessDto, ResponseSuccessListDto, RolesColumn, RolesEnum,
+	SessionsHasTestsColumn, SessionsHasTestsEntity, TestAnswersColumn,
 	TestAnswersEntity, UsersColumn, UsersEntity,
 };
 
@@ -137,8 +138,53 @@ pub async fn query_get_tests(params: MetaRequestDto) -> Response {
 	success_response_list(response)
 }
 
-pub async fn query_get_test_by_id(id: String) -> Response {
+pub async fn query_get_test_by_id(headers: HeaderMap, id: String) -> Response {
 	let db: DatabaseConnection = get_db().await;
+
+	let auth_header = match headers.get("Authorization") {
+		Some(header) => header.to_str(),
+		None => {
+			return common_response(StatusCode::FORBIDDEN, "You are not authorized")
+		}
+	};
+
+	let auth_header = match auth_header {
+		Ok(header) => header,
+		Err(err) => {
+			return common_response(StatusCode::BAD_REQUEST, &err.to_string())
+		}
+	};
+
+	let mut header_parts = auth_header.split_whitespace();
+
+	let token = match header_parts.nth(1) {
+		Some(token) => token,
+		None => {
+			return common_response(StatusCode::BAD_REQUEST, "Invalid token format")
+		}
+	};
+
+	let token_data = match decode_access_token(&token) {
+		Ok(data) => data,
+		Err(err) => {
+			return common_response(StatusCode::UNAUTHORIZED, &err.to_string())
+		}
+	};
+
+	let email = token_data.claims.email.clone();
+
+	let role_name = UsersEntity::find()
+		.select_only()
+		.column_as(RolesColumn::Name, "role_name")
+		.join(
+			JoinType::InnerJoin,
+			<app_users_schema::Entity as sea_orm::EntityTrait>::Relation::Role.def(),
+		)
+		.filter(UsersColumn::Email.eq(email))
+		.into_tuple::<String>()
+		.one(&db)
+		.await
+		.unwrap_or_default();
 
 	let test = match TestsEntity::find()
 		.filter(TestsColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
@@ -164,25 +210,41 @@ pub async fn query_get_test_by_id(id: String) -> Response {
 	let questions_dto: Vec<QuestionsItemDto> =
 		join_all(questions.into_iter().map(|q| {
 			let db = db.clone();
-			async move {
-				let options = OptionsEntity::find()
-					.filter(OptionsColumn::QuestionId.eq(q.id))
-					.all(&db)
-					.await
-					.unwrap_or_default();
-				let options_dto: Vec<OptionsItemDto> = options
-					.into_iter()
-					.map(|opt| OptionsItemDto {
-						id: opt.id.to_string(),
-						label: opt.label,
-					})
-					.collect();
+			{
+				let value = role_name.clone();
+				async move {
+					let options = OptionsEntity::find()
+						.filter(OptionsColumn::QuestionId.eq(q.id))
+						.all(&db)
+						.await
+						.unwrap_or_default();
+					let options_dto: Vec<OptionsItemDto> =
+						options
+							.into_iter()
+							.map(|opt| OptionsItemDto {
+								id: opt.id.to_string(),
+								label: opt.label,
+								is_correct: if <std::option::Option<
+									std::string::String,
+								> as Clone>::clone(&value)
+								.unwrap_or_default()
+								.to_lowercase() == RolesEnum::Admin
+									.to_string()
+									.to_lowercase()
+								{
+									Some(opt.is_correct)
+								} else {
+									None
+								},
+							})
+							.collect();
 
-				QuestionsItemDto {
-					id: q.id.to_string(),
-					question: q.question,
-					discussion: q.discussion,
-					options: options_dto,
+					QuestionsItemDto {
+						id: q.id.to_string(),
+						question: q.question,
+						discussion: q.discussion,
+						options: options_dto,
+					}
 				}
 			}
 		}))
@@ -379,20 +441,19 @@ pub async fn mutation_create_test_answer(
 ) -> Response {
 	let db: DatabaseConnection = get_db().await;
 
+	// Extract and validate the Authorization header
 	let auth_header = match headers.get("Authorization") {
 		Some(header) => header.to_str(),
 		None => {
 			return common_response(StatusCode::FORBIDDEN, "You are not authorized")
 		}
 	};
-
 	let auth_header = match auth_header {
 		Ok(header) => header,
 		Err(err) => {
 			return common_response(StatusCode::BAD_REQUEST, &err.to_string())
 		}
 	};
-
 	let mut header_parts = auth_header.split_whitespace();
 	let token = match header_parts.nth(1) {
 		Some(token) => token,
@@ -400,7 +461,6 @@ pub async fn mutation_create_test_answer(
 			return common_response(StatusCode::BAD_REQUEST, "Invalid token format")
 		}
 	};
-
 	let token_data = match decode_access_token(&token) {
 		Ok(data) => data,
 		Err(err) => {
@@ -408,10 +468,13 @@ pub async fn mutation_create_test_answer(
 		}
 	};
 
-	let email = token_data.claims.email;
+	let user_email = token_data.claims.email.clone();
 
-	let user = match UsersEntity::find()
-		.filter(UsersColumn::Email.eq(email))
+	let user_id = match UsersEntity::find()
+		.select_only()
+		.column(UsersColumn::Id)
+		.filter(UsersColumn::Email.eq(user_email))
+		.into_tuple::<Uuid>()
 		.one(&db)
 		.await
 	{
@@ -425,11 +488,11 @@ pub async fn mutation_create_test_answer(
 		}
 	};
 
-	let new_answer = TestAnswersActiveModel {
+	// Insert a new answer into the app_user_answers table
+	let new_answer = app_user_answers_schema::ActiveModel {
 		id: Set(Uuid::new_v4()),
-		user_id: Set(user.id),
+		user_id: Set(user_id),
 		test_id: Set(Uuid::parse_str(&payload.test_id).unwrap_or_default()),
-		..Default::default()
 	};
 
 	let answer = match new_answer.insert(&db).await {
@@ -442,6 +505,23 @@ pub async fn mutation_create_test_answer(
 		}
 	};
 
+	// Iterate over each question-answer pair and insert a record into app_user_question_answers
+	for qa in &payload.questions {
+		let new_question_answer = app_user_questions_answers_schema::ActiveModel {
+			id: Set(Uuid::new_v4()),
+			answer_id: Set(answer.id),
+			question_id: Set(Uuid::parse_str(&qa.question_id).unwrap_or_default()),
+			option_id: Set(Uuid::parse_str(&qa.option_id).unwrap_or_default()),
+		};
+		if let Err(err) = new_question_answer.insert(&db).await {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			);
+		}
+	}
+
+	// Build and return the response DTO
 	let dto = TestAnswersItemDto {
 		id: answer.id.to_string(),
 		user_id: answer.user_id.to_string(),

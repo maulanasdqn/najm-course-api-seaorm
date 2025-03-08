@@ -122,7 +122,6 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 pub async fn query_get_session_by_id(id: String) -> Response {
 	let db: DatabaseConnection = get_db().await;
 
-	// Fetch the session record by its ID
 	let session = match TestSessionsEntity::find()
 		.filter(TestSessionsColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
 		.one(&db)
@@ -140,7 +139,6 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		}
 	};
 
-	// Query the join table to fetch related tests without alias conflict
 	let sessions_tests = match app_sessions_has_tests_schema::Entity::find()
 		.filter(app_sessions_has_tests_schema::Column::SessionId.eq(session.id))
 		.find_also_related(TestsEntity)
@@ -161,7 +159,6 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		.filter_map(|(_join, test_opt)| test_opt)
 		.collect();
 
-	// Build DTOs for tests concurrently
 	let tests_dto_futures = tests_entities.into_iter().map(|test| {
 		let db = db.clone();
 		async move {
@@ -181,7 +178,6 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 	});
 	let tests_dto: Vec<TestsItemListDto> = join_all(tests_dto_futures).await;
 
-	// Build the session DTO
 	let session_dto = SessionsItemDto {
 		id: session.id.to_string(),
 		session_name: session.session_name,

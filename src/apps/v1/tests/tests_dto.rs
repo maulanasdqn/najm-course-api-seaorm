@@ -32,6 +32,7 @@ pub struct QuestionsItemDto {
 pub struct OptionsItemDto {
 	pub id: String,
 	pub label: String,
+	pub is_correct: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
