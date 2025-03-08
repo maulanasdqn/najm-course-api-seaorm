@@ -1,4 +1,4 @@
-use super::app_sessions_has_tests_schema::Relation;
+use super::app_sessions_has_tests_schema::{self, Relation};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -19,8 +19,8 @@ pub struct Model {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-impl Related<crate::app_sessions_has_tests_schema::Entity> for Entity {
+impl Related<app_sessions_has_tests_schema::Entity> for Entity {
 	fn to() -> RelationDef {
-		Relation::Session.def()
+		app_sessions_has_tests_schema::Relation::Session.def()
 	}
 }

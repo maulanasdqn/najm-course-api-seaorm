@@ -3,13 +3,13 @@ use chrono::Utc;
 use futures::future::join_all;
 use sea_orm::{
 	prelude::*, sea_query::extension::postgres::PgExpr, ActiveModelTrait,
-	ColumnTrait, DatabaseConnection, EntityTrait, JoinType, ModelTrait,
-	PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+	ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait,
+	QueryFilter, QueryOrder, Set,
 };
 use uuid::Uuid;
 
 use crate::{
-	common_response, get_db,
+	app_sessions_has_tests_schema, common_response, get_db,
 	schemas::{
 		app_sessions_has_tests_schema as sessions_has_tests,
 		TestSessionsActiveModel, TestSessionsColumn, TestSessionsEntity,
@@ -98,7 +98,7 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 					student_type: session.student_type,
 					description: session.description,
 					is_active: session.is_active,
-					category: "General".to_string(),
+					category: session.category,
 					test_count,
 					created_at: session.created_at.map(|dt| dt.to_string()),
 					updated_at: session.updated_at.map(|dt| dt.to_string()),
@@ -122,6 +122,7 @@ pub async fn query_get_sessions(params: MetaRequestDto) -> Response {
 pub async fn query_get_session_by_id(id: String) -> Response {
 	let db: DatabaseConnection = get_db().await;
 
+	// Fetch the session record by its ID
 	let session = match TestSessionsEntity::find()
 		.filter(TestSessionsColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
 		.one(&db)
@@ -139,16 +140,14 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		}
 	};
 
-	let tests_entities = match TestsEntity::find()
-		.join(
-			JoinType::InnerJoin,
-			sessions_has_tests::Relation::Test.def(),
-		)
-		.filter(sessions_has_tests::Column::SessionId.eq(session.id))
+	// Query the join table to fetch related tests without alias conflict
+	let sessions_tests = match app_sessions_has_tests_schema::Entity::find()
+		.filter(app_sessions_has_tests_schema::Column::SessionId.eq(session.id))
+		.find_also_related(TestsEntity)
 		.all(&db)
 		.await
 	{
-		Ok(tests) => tests,
+		Ok(result) => result,
 		Err(err) => {
 			return common_response(
 				StatusCode::INTERNAL_SERVER_ERROR,
@@ -157,6 +156,12 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 		}
 	};
 
+	let tests_entities: Vec<<TestsEntity as EntityTrait>::Model> = sessions_tests
+		.into_iter()
+		.filter_map(|(_join, test_opt)| test_opt)
+		.collect();
+
+	// Build DTOs for tests concurrently
 	let tests_dto_futures = tests_entities.into_iter().map(|test| {
 		let db = db.clone();
 		async move {
@@ -176,6 +181,7 @@ pub async fn query_get_session_by_id(id: String) -> Response {
 	});
 	let tests_dto: Vec<TestsItemListDto> = join_all(tests_dto_futures).await;
 
+	// Build the session DTO
 	let session_dto = SessionsItemDto {
 		id: session.id.to_string(),
 		session_name: session.session_name,

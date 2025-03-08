@@ -3,6 +3,8 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::app_sessions_has_tests_schema;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "app_tests")]
 pub struct Model {
@@ -15,8 +17,8 @@ pub struct Model {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-impl Related<crate::app_sessions_has_tests_schema::Entity> for Entity {
+impl Related<app_sessions_has_tests_schema::Entity> for Entity {
 	fn to() -> RelationDef {
-		Relation::Test.def()
+		app_sessions_has_tests_schema::Relation::Test.def()
 	}
 }
