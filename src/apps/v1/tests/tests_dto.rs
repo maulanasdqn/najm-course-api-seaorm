@@ -101,6 +101,8 @@ pub struct TestsItemDto {
 	pub id: String,
 	pub test_name: String,
 	pub questions: Vec<QuestionsItemDto>,
+	pub start_date: Option<String>,
+	pub end_date: Option<String>,
 	pub created_at: Option<String>,
 	pub updated_at: Option<String>,
 }

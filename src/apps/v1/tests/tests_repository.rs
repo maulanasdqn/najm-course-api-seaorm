@@ -188,6 +188,36 @@ pub async fn query_get_test_by_id(headers: HeaderMap, id: String) -> Response {
 		.await
 		.unwrap_or_default();
 
+	let start_date = match SessionsHasTestsEntity::find()
+		.select_only()
+		.column(SessionsHasTestsColumn::StartDate)
+		.filter(
+			SessionsHasTestsColumn::TestId
+				.eq(Uuid::parse_str(&id).unwrap_or_default()),
+		)
+		.into_tuple::<Option<chrono::DateTime<chrono::Utc>>>()
+		.one(&db)
+		.await
+	{
+		Ok(Some(date)) => date,
+		_ => None,
+	};
+
+	let end_date = match SessionsHasTestsEntity::find()
+		.select_only()
+		.column(SessionsHasTestsColumn::EndDate)
+		.filter(
+			SessionsHasTestsColumn::TestId
+				.eq(Uuid::parse_str(&id).unwrap_or_default()),
+		)
+		.into_tuple::<Option<chrono::DateTime<chrono::Utc>>>()
+		.one(&db)
+		.await
+	{
+		Ok(Some(date)) => date,
+		_ => None,
+	};
+
 	let test = match TestsEntity::find()
 		.filter(TestsColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
 		.one(&db)
@@ -257,6 +287,8 @@ pub async fn query_get_test_by_id(headers: HeaderMap, id: String) -> Response {
 	let test_dto = TestsItemDto {
 		id: test.id.to_string(),
 		test_name: test.test_name,
+		start_date: start_date.map(|dt| dt.to_string()),
+		end_date: end_date.map(|dt| dt.to_string()),
 		questions: questions_dto,
 		created_at: test.created_at.map(|dt| dt.to_string()),
 		updated_at: test.updated_at.map(|dt| dt.to_string()),
