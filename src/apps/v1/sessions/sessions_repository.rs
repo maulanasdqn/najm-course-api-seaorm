@@ -228,13 +228,14 @@ pub async fn mutation_create_session(
 
 				let start_date = chrono::NaiveDateTime::parse_from_str(
 					&test_dto.start_date,
-					"%Y-%m-%dT%H:%M:%S",
+					"%Y-%m-%dT%H:%M",
 				)
 				.ok()
 				.map(|dt| dt.and_local_timezone(Utc).unwrap());
+
 				let end_date = chrono::NaiveDateTime::parse_from_str(
 					&test_dto.end_date,
-					"%Y-%m-%dT%H:%M:%S",
+					"%Y-%m-%dT%H:%M",
 				)
 				.ok()
 				.map(|dt| dt.and_local_timezone(Utc).unwrap());
