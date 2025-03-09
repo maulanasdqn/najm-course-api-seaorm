@@ -15,6 +15,13 @@ pub struct QuestionsAnswersRequestCreateDto {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct QuestionsAnswersItemDto {
+	pub id: String,
+	pub test_name: String,
+	pub questions: Vec<QuestionsAnswersDataItemDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TestAnswersRequestCreateDto {
 	pub test_id: String,
 	pub questions: Vec<QuestionsAnswersRequestCreateDto>,
@@ -27,12 +34,27 @@ pub struct QuestionsItemDto {
 	pub discussion: String,
 	pub options: Vec<OptionsItemDto>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct QuestionsAnswersDataItemDto {
+	pub id: String,
+	pub question: String,
+	pub discussion: String,
+	pub options: Vec<OptionsAnswerItemDto>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct OptionsItemDto {
 	pub id: String,
 	pub label: String,
 	pub is_correct: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct OptionsAnswerItemDto {
+	pub id: String,
+	pub label: String,
+	pub is_correct: Option<bool>,
+	pub is_selected: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

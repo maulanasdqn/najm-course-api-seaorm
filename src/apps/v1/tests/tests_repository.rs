@@ -20,7 +20,8 @@ use crate::{
 	success_response, success_response_list, MetaRequestDto, MetaResponseDto,
 	ResponseSuccessDto, ResponseSuccessListDto, RolesColumn, RolesEnum,
 	SessionsHasTestsColumn, SessionsHasTestsEntity, TestAnswersColumn,
-	TestAnswersEntity, UsersColumn, UsersEntity,
+	TestAnswersEntity, TestQuestionsAnswersColumn, TestQuestionsAnswersEntity,
+	UsersColumn, UsersEntity,
 };
 
 use super::{
@@ -28,6 +29,7 @@ use super::{
 		OptionsItemDto, QuestionsItemDto, TestsItemDto, TestsItemListDto,
 		TestsRequestCreateDto, TestsRequestUpdateDto,
 	},
+	OptionsAnswerItemDto, QuestionsAnswersDataItemDto, QuestionsAnswersItemDto,
 	TestAnswersItemDto, TestAnswersRequestCreateDto,
 };
 
@@ -406,9 +408,10 @@ pub async fn mutation_delete_test(id: String) -> Response {
 }
 
 pub async fn query_get_test_answer_by_id(id: String) -> Response {
-	let db: DatabaseConnection = get_db().await;
+	let db = get_db().await;
 
-	let answer = match TestAnswersEntity::find()
+	// 1. Fetch the parent test answer record.
+	let test_answer = match TestAnswersEntity::find()
 		.filter(TestAnswersColumn::Id.eq(Uuid::parse_str(&id).unwrap_or_default()))
 		.one(&db)
 		.await
@@ -425,10 +428,86 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 		}
 	};
 
-	let dto = TestAnswersItemDto {
-		id: answer.id.to_string(),
-		user_id: answer.user_id.to_string(),
-		test_id: answer.test_id.to_string(),
+	// 2. Retrieve the test name.
+	let test_name = match TestsEntity::find_by_id(test_answer.test_id).one(&db).await
+	{
+		Ok(Some(test)) => test.test_name,
+		_ => "Unknown".to_string(),
+	};
+
+	// 3. Get all related question answers for this test answer.
+	let question_answers = match TestQuestionsAnswersEntity::find()
+		.filter(TestQuestionsAnswersColumn::AnswerId.eq(test_answer.id))
+		.all(&db)
+		.await
+	{
+		Ok(list) => list,
+		Err(err) => {
+			return common_response(
+				StatusCode::INTERNAL_SERVER_ERROR,
+				&err.to_string(),
+			)
+		}
+	};
+
+	// 4. Create a unique set of question IDs from the join records.
+	use std::collections::HashSet;
+	let question_ids: HashSet<Uuid> =
+		question_answers.iter().map(|qa| qa.question_id).collect();
+
+	let mut questions: Vec<QuestionsAnswersDataItemDto> = Vec::new();
+
+	// 5. For each unique question, fetch the question details and its options.
+	for qid in question_ids {
+		// Fetch the question.
+		let question = match QuestionsEntity::find_by_id(qid).one(&db).await {
+			Ok(Some(q)) => q,
+			_ => continue, // Skip if question not found.
+		};
+
+		// Fetch all options available for this question.
+		let options_for_question = match OptionsEntity::find()
+			.filter(OptionsColumn::QuestionId.eq(qid))
+			.all(&db)
+			.await
+		{
+			Ok(opts) => opts,
+			Err(_) => vec![],
+		};
+
+		// 6. Build the options DTO.
+		let options_dto: Vec<OptionsAnswerItemDto> = options_for_question
+			.into_iter()
+			.map(|option| {
+				// Use .iter() on the join records to check if this option was selected.
+				let is_selected = question_answers
+					.iter()
+					.any(|qa| qa.question_id == qid && qa.option_id == option.id);
+				OptionsAnswerItemDto {
+					id: option.id.to_string(),
+					label: option.label,
+					is_correct: Some(option.is_correct),
+					is_selected: Some(is_selected),
+				}
+			})
+			.collect();
+
+		// 7. Build the question DTO.
+		let question_dto = QuestionsAnswersDataItemDto {
+			id: qid.to_string(),
+			question: question.question, // Adjust if your field name differs.
+			discussion: question.discussion, // Adjust if your field name differs.
+			options: options_dto,
+		};
+
+		questions.push(question_dto);
+	}
+
+	// 8. Build the final DTO.
+	let dto = QuestionsAnswersItemDto {
+		id: test_answer.id.to_string(),
+		test_name,
+		questions,
 	};
 
 	let response = ResponseSuccessDto { data: dto };
