@@ -8,6 +8,7 @@ pub struct Model {
 	pub id: Uuid,
 	pub question_id: Uuid,
 	pub label: String,
+	pub image_url: Option<String>,
 	pub is_correct: bool,
 }
 

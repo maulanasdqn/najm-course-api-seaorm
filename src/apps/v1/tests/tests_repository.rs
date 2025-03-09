@@ -226,6 +226,7 @@ pub async fn query_get_test_by_id(headers: HeaderMap, id: String) -> Response {
 							.map(|opt| OptionsItemDto {
 								id: opt.id.to_string(),
 								label: opt.label,
+								image_url: opt.image_url,
 								is_correct: if <std::option::Option<
 									std::string::String,
 								> as Clone>::clone(&value)
@@ -246,6 +247,7 @@ pub async fn query_get_test_by_id(headers: HeaderMap, id: String) -> Response {
 						question: q.question,
 						discussion: q.discussion,
 						options: options_dto,
+						image_url: q.image_url,
 					}
 				}
 			}
@@ -435,6 +437,22 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 		_ => "Unknown".to_string(),
 	};
 
+	let (test_start_date, test_end_date) = match SessionsHasTestsEntity::find()
+		.select_only()
+		.column(SessionsHasTestsColumn::StartDate)
+		.column(SessionsHasTestsColumn::EndDate)
+		.filter(SessionsHasTestsColumn::TestId.eq(test_answer.test_id))
+		.into_tuple::<(
+			Option<chrono::DateTime<chrono::Utc>>,
+			Option<chrono::DateTime<chrono::Utc>>,
+		)>()
+		.one(&db)
+		.await
+	{
+		Ok(Some((start, end))) => (start, end),
+		_ => (None, None),
+	};
+
 	// 3. Get all related question answers for this test answer.
 	let question_answers = match TestQuestionsAnswersEntity::find()
 		.filter(TestQuestionsAnswersColumn::AnswerId.eq(test_answer.id))
@@ -486,6 +504,7 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 				OptionsAnswerItemDto {
 					id: option.id.to_string(),
 					label: option.label,
+					image_url: option.image_url,
 					is_correct: Some(option.is_correct),
 					is_selected: Some(is_selected),
 				}
@@ -508,6 +527,8 @@ pub async fn query_get_test_answer_by_id(id: String) -> Response {
 		id: test_answer.id.to_string(),
 		test_name,
 		questions,
+		start_date: test_start_date.map(|dt| dt.to_string()),
+		end_date: test_end_date.map(|dt| dt.to_string()),
 	};
 
 	let response = ResponseSuccessDto { data: dto };
