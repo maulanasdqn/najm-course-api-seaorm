@@ -397,12 +397,124 @@ pub async fn mutation_update_test(
 	}
 	active_model.updated_at = Set(Some(Utc::now()));
 
-	match active_model.update(&db).await {
-		Ok(_test) => common_response(StatusCode::OK, "Test updated successfully"),
-		Err(err) => {
-			common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string())
+	if let Err(err) = active_model.update(&db).await {
+		return common_response(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
+	}
+
+	for question in &payload.questions {
+		let question_id = match &question.id {
+			Some(id_str) => match Uuid::parse_str(id_str) {
+				Ok(uuid) => uuid,
+				Err(_) => {
+					return common_response(
+						StatusCode::BAD_REQUEST,
+						"Invalid question ID format",
+					)
+				}
+			},
+			None => Uuid::new_v4(),
+		};
+
+		let mut question_model = if question.id.is_some() {
+			match QuestionsEntity::find_by_id(question_id).one(&db).await {
+				Ok(Some(q)) => q.into(),
+				Ok(None) => {
+					return common_response(
+						StatusCode::NOT_FOUND,
+						"Question not found",
+					)
+				}
+				Err(err) => {
+					return common_response(
+						StatusCode::INTERNAL_SERVER_ERROR,
+						&err.to_string(),
+					)
+				}
+			}
+		} else {
+			QuestionsActiveModel {
+				id: Set(question_id),
+				test_id: Set(test_id),
+				..Default::default()
+			}
+		};
+
+		question_model.question = Set(question.question.clone());
+		question_model.discussion = Set(question.discussion.clone());
+
+		let saved_question = if question.id.is_some() {
+			question_model.update(&db).await
+		} else {
+			question_model.insert(&db).await
+		};
+
+		let saved_question = match saved_question {
+			Ok(q) => q,
+			Err(err) => {
+				return common_response(
+					StatusCode::INTERNAL_SERVER_ERROR,
+					&err.to_string(),
+				)
+			}
+		};
+
+		for option in &question.options {
+			let option_id = match &option.id {
+				Some(opt_id) => match Uuid::parse_str(opt_id) {
+					Ok(uuid) => uuid,
+					Err(_) => {
+						return common_response(
+							StatusCode::BAD_REQUEST,
+							"Invalid option ID format",
+						)
+					}
+				},
+				None => Uuid::new_v4(),
+			};
+
+			let mut option_model = if option.id.is_some() {
+				match OptionsEntity::find_by_id(option_id).one(&db).await {
+					Ok(Some(o)) => o.into(),
+					Ok(None) => {
+						return common_response(
+							StatusCode::NOT_FOUND,
+							"Option not found",
+						)
+					}
+					Err(err) => {
+						return common_response(
+							StatusCode::INTERNAL_SERVER_ERROR,
+							&err.to_string(),
+						)
+					}
+				}
+			} else {
+				OptionsActiveModel {
+					id: Set(option_id),
+					question_id: Set(saved_question.id),
+					..Default::default()
+				}
+			};
+
+			option_model.label = Set(option.label.clone());
+			option_model.is_correct = Set(option.is_correct);
+
+			let result = if option.id.is_some() {
+				option_model.update(&db).await
+			} else {
+				option_model.insert(&db).await
+			};
+
+			if let Err(err) = result {
+				return common_response(
+					StatusCode::INTERNAL_SERVER_ERROR,
+					&err.to_string(),
+				);
+			}
 		}
 	}
+
+	common_response(StatusCode::OK, "Test updated successfully")
 }
 
 pub async fn mutation_delete_test(id: String) -> Response {

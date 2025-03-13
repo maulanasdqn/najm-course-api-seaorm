@@ -71,7 +71,23 @@ pub struct QuestionsRequestCreateDto {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct QuestionsRequestUpdateDto {
+	pub id: Option<String>,
+	pub question: String,
+	pub discussion: String,
+	pub image_url: Option<String>,
+	pub options: Vec<OptionsRequestUpdateDto>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct OptionsRequestCreateDto {
+	pub label: String,
+	pub is_correct: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct OptionsRequestUpdateDto {
+	pub id: Option<String>,
 	pub label: String,
 	pub is_correct: bool,
 }
@@ -79,6 +95,7 @@ pub struct OptionsRequestCreateDto {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct TestsRequestUpdateDto {
 	pub test_name: Option<String>,
+	pub questions: Vec<QuestionsRequestUpdateDto>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
