@@ -324,6 +324,7 @@ pub async fn mutation_create_test(payload: Json<TestsRequestCreateDto>) -> Respo
 			id: Set(Uuid::new_v4()),
 			test_id: Set(test.id),
 			question: Set(question.question.clone()),
+			image_url: Set(question.image_url.clone()),
 			discussion: Set(question.discussion.clone()),
 			..Default::default()
 		};
@@ -343,6 +344,7 @@ pub async fn mutation_create_test(payload: Json<TestsRequestCreateDto>) -> Respo
 				id: Set(Uuid::new_v4()),
 				question_id: Set(inserted_question.id),
 				is_correct: Set(option.is_correct),
+				image_url: Set(Some(option.image_url.clone())),
 				label: Set(option.label.clone()),
 				..Default::default()
 			};
@@ -441,6 +443,7 @@ pub async fn mutation_update_test(
 
 		question_model.question = Set(question.question.clone());
 		question_model.discussion = Set(question.discussion.clone());
+		question_model.image_url = Set(question.image_url.clone());
 
 		let saved_question = if question.id.is_some() {
 			question_model.update(&db).await
@@ -498,6 +501,7 @@ pub async fn mutation_update_test(
 
 			option_model.label = Set(option.label.clone());
 			option_model.is_correct = Set(option.is_correct);
+			option_model.image_url = Set(Some(option.image_url.clone()));
 
 			let result = if option.id.is_some() {
 				option_model.update(&db).await

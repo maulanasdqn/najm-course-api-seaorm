@@ -83,6 +83,7 @@ pub struct QuestionsRequestUpdateDto {
 pub struct OptionsRequestCreateDto {
 	pub label: String,
 	pub is_correct: bool,
+	pub image_url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -90,6 +91,7 @@ pub struct OptionsRequestUpdateDto {
 	pub id: Option<String>,
 	pub label: String,
 	pub is_correct: bool,
+	pub image_url: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
