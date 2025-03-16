@@ -11,6 +11,7 @@ mod m20250305_031240_change_has_session_type;
 mod m20250307_195832_add_category_to_session;
 mod m20250308_154930_user_question_answer;
 mod m20250309_072200_add_image_url_to_questions_and_options;
+mod m20250316_055046_add_discussion_image_url;
 
 pub struct Migrator;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
 			Box::new(
 				m20250309_072200_add_image_url_to_questions_and_options::Migration,
 			),
+			Box::new(m20250316_055046_add_discussion_image_url::Migration),
 		]
 	}
 }

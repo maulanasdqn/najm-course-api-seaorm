@@ -10,6 +10,7 @@ pub struct Model {
 	pub question: String,
 	pub image_url: Option<String>,
 	pub discussion: String,
+	pub discussion_image_url: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

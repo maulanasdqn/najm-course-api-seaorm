@@ -66,6 +66,7 @@ pub struct OptionsAnswerItemDto {
 pub struct QuestionsRequestCreateDto {
 	pub question: String,
 	pub discussion: String,
+	pub discussion_image_url: Option<String>,
 	pub image_url: Option<String>,
 	pub options: Vec<OptionsRequestCreateDto>,
 }
@@ -75,6 +76,7 @@ pub struct QuestionsRequestUpdateDto {
 	pub id: Option<String>,
 	pub question: String,
 	pub discussion: String,
+	pub discussion_image_url: Option<String>,
 	pub image_url: Option<String>,
 	pub options: Vec<OptionsRequestUpdateDto>,
 }

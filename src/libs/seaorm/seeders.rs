@@ -235,6 +235,9 @@ pub async fn run_seeds(db: &DatabaseConnection) -> Result<(), DbErr> {
 					question: Set(question_text.clone()),
 					discussion: Set("Auto-generated question".to_owned()),
 					image_url: Set(Some("https://example.com/image.jpg".to_owned())),
+					discussion_image_url: Set(Some(
+						"https://example.com/image.jpg".to_owned(),
+					)),
 				};
 				questions::Entity::insert(new_question).exec(db).await?;
 				println!("Inserted question '{}'.", question_text);
